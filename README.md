@@ -1,7 +1,7 @@
 # SystemN
-My take on RISC-V UNIX clone.
-Some ideas were taken from xv6, but no code was copied verbatim.
-
-Install qemu-system-riscv64
-make clean
-make run
+My take on RISC-V UNIX clone.<br />
+Some ideas were taken from xv6, but no code was copied verbatim.<br />
+<br />
+Install qemu-system-riscv64<br />
+make clean<br />
+make run<br />
