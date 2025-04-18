@@ -13,7 +13,9 @@ TARGET = kernel
 LINKER = kernel.ld
 
 # Flags
-CFLAGS = -march=rv64g -mabi=lp64 -nostdlib -fno-pic -mno-relax -mcmodel=medany -Wall -Wextra -O0
+CFLAGS = -march=rv64g -mabi=lp64 -nostdlib -fno-pic -mno-relax \
+         -mcmodel=medany -Wall -Wextra -O0 -march=rv64imac_zicsr_zihintpause \
+         -mabi=lp64
 LDFLAGS = -T $(LINKER)
 
 all: $(TARGET).bin
@@ -39,7 +41,15 @@ dump: $(TARGET).elf
 
 # Run in QEMU
 run: $(TARGET).bin
-	qemu-system-riscv64 -machine virt -smp 4 -bios none -nographic -kernel $(TARGET).bin
+	qemu-system-riscv64 -machine virt \
+                        -smp 4 \
+                        -bios none \
+                        -nographic \
+                        -cpu rv64,zihintpause=true \
+                        -monitor none \
+                        -serial stdio \
+                        -display none \
+                        -kernel $(TARGET).bin
 
 clean:
 	rm -f *.o *.elf *.bin *.asm

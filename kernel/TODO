@@ -1,0 +1,2 @@
+- disable interrupts before locking
+- timer / software interrupts
