@@ -22,7 +22,7 @@ read_tp()
 }
 
 static inline void
-write_tp(uint64_t val)
+write_tp(ulong val)
 {
     asm volatile("mv tp, %0" :: "r"(val));
 }

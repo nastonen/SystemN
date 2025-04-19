@@ -7,15 +7,31 @@
 
 //static spinlock_t uart_lock = SPINLOCK_INIT;
 
+void s_mode_main();
+
 void
 start()
 {
+    // Set struct cpu to tp register
+    uint hart_id = read_csr(mhartid);
+    write_tp((ulong)&cpus[hart_id]);
+
+    // Set hart_id to struct cpu
+    struct cpu *c = curr_cpu();
+    c->id = hart_id;
+
     // Delegate exceptions and interrupts to S-mode
     write_csr(medeleg, 0xffff);
     write_csr(mideleg, 0xffff);
+    //ulong sie = read_csr(sie);
+    //write_csr(sie, sie | (1L << 9) | (1L << 5) | (1L << 1));
+
+    // Setup PMP to give S-mode access to all memory
+    write_csr(pmpaddr0, -1L);     // Top of memory range (all memory)
+    write_csr(pmpcfg0, 0x0f);     // R/W/X permissions, TOR mode
 
     // Set S-mode trap vector
-    write_csr(stvec, (ulong)s_trap_vector);
+    write_csr(stvec, s_trap_vector);
 
     // Set up mstatus to enter S-mode
     ulong mstatus = read_csr(mstatus);
@@ -30,42 +46,26 @@ start()
     write_csr(satp, 0);
 
     // Drop into S-mode!
+    //asm volatile("jalr x0, %0" : : "r"(s_mode_main));  // Jump directly to s_mode_main
     asm volatile("mret");
-
-
-    // Print to UART
-    /*
-    spin_lock(&uart_lock);
-
-    uart_puts("Hart ");
-    uart_putc('0' + read_mhartid());
-    uart_puts(": Hello from RISC-V!\n");
-
-    spin_unlock(&uart_lock);
-    */
 }
 
 void
 s_mode_main()
 {
-    // Set hartid to tp register
-    write_tp((ulong)&cpus[read_csr(mhartid)]);
-
-    // Set hartid to struct cpu
-    struct cpu *c = curr_cpu();
-    c->id = read_csr(mhartid);
-
     // Enable interrupts in S-mode
     ulong sstatus = read_csr(sstatus);
-    sstatus |= (1 << 1); // SIE bit
+    sstatus |= (1UL << 1); // SIE bit
     write_csr(sstatus, sstatus);
 
-    // For now, just print a message using UART
-    volatile char *uart = (char *)0x10000000;
-    const char *msg = "Hello from S-mode!\n";
+    // Test trap call
+    //asm volatile("ecall");
 
-    while (*msg)
-        *uart = *msg++;
+    spin_lock(&uart_lock);
+    uart_puts("Hart ");
+    uart_putc('0' + curr_cpu()->id);
+    uart_puts(": Hello from S-mode!\n");
+    spin_unlock(&uart_lock);
 
     while (1)
         asm volatile("wfi");

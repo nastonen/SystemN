@@ -1,4 +1,6 @@
 #include "spinlock.h"
+#include "proc.h"
+#include "uart.h"
 
 void
 spin_lock(spinlock_t *lock)
@@ -8,18 +10,26 @@ spin_lock(spinlock_t *lock)
     if (c->lock_depth == 0) {
         // Save current interrupt state and disable interrupts
         c->sstatus = read_csr(sstatus);
-        write_csr(sstatus, c->sstatus & ~0x2);
+        write_csr(sstatus, c->sstatus & ~(1UL << 1));  // Clear SIE
+
     }
     c->lock_depth++;
 
     while (__atomic_test_and_set(&lock->locked, __ATOMIC_ACQUIRE))
-        asm volatile("pause");
+        asm volatile("nop");
 }
 
 void
 spin_unlock(spinlock_t *lock)
 {
     struct cpu *c = curr_cpu();
+
+    // Sanity check: lock should not be unlocked if not locked
+    if (c->lock_depth == 0) {
+        uart_puts("[panic] spin_unlock: lock_depth underflow\n");
+        while (1)
+            asm volatile("wfi");
+    }
 
     // Decrement lock nesting depth
     c->lock_depth--;

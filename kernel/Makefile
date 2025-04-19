@@ -8,14 +8,13 @@ OBJCOPY = $(CROSS)objcopy
 OBJDUMP = $(CROSS)objdump
 
 # Files
-OBJS = entry.o start.o uart.o spinlock.o
+OBJS = entry.o start.o uart.o spinlock.o proc.o trap/trap.o trap/trap_vec.o
 TARGET = kernel
 LINKER = kernel.ld
 
 # Flags
 CFLAGS = -march=rv64g -mabi=lp64 -nostdlib -fno-pic -mno-relax \
-         -mcmodel=medany -Wall -Wextra -O0 -march=rv64imac_zicsr_zihintpause \
-         -mabi=lp64
+         -mcmodel=medany -Wall -Wextra -O0
 LDFLAGS = -T $(LINKER)
 
 all: $(TARGET).bin
@@ -52,7 +51,7 @@ run: $(TARGET).bin
                         -kernel $(TARGET).bin
 
 clean:
-	rm -f *.o *.elf *.bin *.asm
+	rm -f $(shell find . -name '*.o' -o -name '*.elf' -o -name '*.bin' -o -name '*.asm')
+
 
 .PHONY: all clean dump run
-
