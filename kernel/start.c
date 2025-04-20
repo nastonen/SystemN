@@ -4,10 +4,25 @@
 #include "trap/trap.h"
 #include "types.h"
 #include "proc.h"
+#include "timer.h"
 
-//static spinlock_t uart_lock = SPINLOCK_INIT;
+void
+s_mode_main()
+{
 
-void s_mode_main();
+    // Test trap call
+    //asm volatile("ecall");
+
+    // Just print hello for now
+    spin_lock(&uart_lock);
+    uart_puts("Hart ");
+    uart_putc('0' + curr_cpu()->id);
+    uart_puts(": Hello from S-mode!\n");
+    spin_unlock(&uart_lock);
+
+    while (1)
+        asm volatile("wfi");
+}
 
 void
 start()
@@ -39,34 +54,22 @@ start()
     mstatus |= (1UL << 11);       // Set MPP = S-mode (01)
     write_csr(mstatus, mstatus);
 
-    // Set mepc to the address of S-mode entry point
-    write_csr(mepc, (ulong)s_mode_main);
+    // Enable interrupts in S-mode
+    write_csr(sstatus, read_csr(sstatus) | (1L << 1));
+
+    // Init timer interrupts
+    write_csr(sie, read_csr(sie) | (1L << 5));
+    write_csr(menvcfg, read_csr(menvcfg) | (1L << 63));
+    write_csr(mcounteren, read_csr(mcounteren) | (1L << 1));
+    timer_init();
 
     // Optional: disable paging for now
     write_csr(satp, 0);
 
+    // Set mepc to the address of S-mode entry point
+    write_csr(mepc, (ulong)s_mode_main);
+
     // Drop into S-mode!
     //asm volatile("jalr x0, %0" : : "r"(s_mode_main));  // Jump directly to s_mode_main
     asm volatile("mret");
-}
-
-void
-s_mode_main()
-{
-    // Enable interrupts in S-mode
-    ulong sstatus = read_csr(sstatus);
-    sstatus |= (1UL << 1); // SIE bit
-    write_csr(sstatus, sstatus);
-
-    // Test trap call
-    //asm volatile("ecall");
-
-    spin_lock(&uart_lock);
-    uart_puts("Hart ");
-    uart_putc('0' + curr_cpu()->id);
-    uart_puts(": Hello from S-mode!\n");
-    spin_unlock(&uart_lock);
-
-    while (1)
-        asm volatile("wfi");
 }

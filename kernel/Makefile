@@ -8,7 +8,8 @@ OBJCOPY = $(CROSS)objcopy
 OBJDUMP = $(CROSS)objdump
 
 # Files
-OBJS = entry.o start.o uart.o spinlock.o proc.o trap/trap.o trap/trap_vec.o
+OBJS = entry.o start.o uart.o spinlock.o proc.o trap/trap.o \
+       trap/trap_vec.o
 TARGET = kernel
 LINKER = kernel.ld
 
