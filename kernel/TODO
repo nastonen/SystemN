@@ -1,0 +1,5 @@
+- will 'write' syscall print one char at a time?
+    Meaning to print a string I have to make n syscalls
+    where n is len of the string?
+
+- timer preemption
