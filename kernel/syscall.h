@@ -10,11 +10,9 @@
 //#define SYS_close   57
 //#define SYS_brk     214
 
-#pragma once
-
 static inline long
 syscall(long num, long arg0, long arg1, long arg2,
-        long arg3, long arg4, long arg5)
+                  long arg3, long arg4, long arg5)
 {
     register long a0 asm("a0") = arg0;
     register long a1 asm("a1") = arg1;
