@@ -5,20 +5,28 @@
 #include "types.h"
 #include "proc.h"
 #include "timer.h"
+#include "syscall.h"
+
+void
+test_syscall()
+{
+    syscall3(SYS_write, (long)"Hello from wrapped syscall!\n", 0, 0);
+    syscall0(SYS_exit); // Halts the system
+}
 
 void
 s_mode_main()
 {
-
-    // Test trap call
-    //asm volatile("ecall");
-
     // Just print hello for now
     spin_lock(&uart_lock);
     uart_puts("Hart ");
     uart_putc('0' + curr_cpu()->id);
     uart_puts(": Hello from S-mode!\n");
     spin_unlock(&uart_lock);
+
+    // Test trap call
+    if (curr_cpu()->id == 0)
+        test_syscall();
 
     while (1)
         asm volatile("wfi");

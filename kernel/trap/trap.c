@@ -16,7 +16,9 @@ syscall_handler(trap_frame_t *tf)
     switch(syscall_num) {
         case SYS_write:
             // 'write' syscall: arguments in a0 (fd), a1 (buffer), a2 (size)
+            spin_lock(&uart_lock);
             uart_puts((char*)tf->regs[10]);
+            spin_unlock(&uart_lock);
             tf->regs[10] = 0;
             break;
         case SYS_exit:
@@ -58,14 +60,25 @@ s_trap_handler(trap_frame_t *tf)
     spin_unlock(&uart_lock);
     */
 
-    // 8 - U-mode, 9 - S-mode
-    if (code == 8 || code == 9) {
+    if (code == 8) {
+        // User-mode (U-mode)
         spin_lock(&uart_lock);
-        uart_puts("[S] System call received\n");
+        uart_puts("[S] U-mode system call received\n");
+        spin_unlock(&uart_lock);
         //write_csr(sepc, epc + 4); // skip 'ecall'
         tf->sepc += 4;
         syscall_handler(tf);
+    } else if (code == 9) {
+        // Supervisor-mode (S-mode)
+        spin_lock(&uart_lock);
+        uart_puts("[S] S-mode system call received\n");
+        //uart_puts("TF a7 = ");
+        //uart_puthex(tf->regs[17]);  // a7
+        //uart_putc('\n');
         spin_unlock(&uart_lock);
+        //write_csr(sepc, epc + 4); // skip 'ecall'
+        tf->sepc += 4;
+        syscall_handler(tf);
     } else if ((cause & SCAUSE_IRQ_BIT) && code == 5) {
         // Timer interrupt
         timer_handle();
