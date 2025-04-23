@@ -7,6 +7,8 @@
 #include "timer.h"
 #include "syscall.h"
 
+static struct proc test_proc;
+
 void
 test_syscall()
 {
@@ -25,8 +27,13 @@ s_mode_main()
     spin_unlock(&uart_lock);
 
     // Test trap call
-    if (curr_cpu()->id == 0)
+    if (curr_cpu()->id == 0) {
+        test_proc.pid = 1;
+        test_proc.state = RUNNING;
+        curr_cpu()->proc = &test_proc;
+
         test_syscall();
+    }
 
     while (1)
         asm volatile("wfi");
