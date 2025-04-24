@@ -6,13 +6,28 @@
 #include "proc.h"
 #include "timer.h"
 #include "syscall.h"
+#include "string.h"
 
-static struct proc test_proc;
+void
+setup_idle_proc()
+{
+    struct cpu *c = curr_cpu();
+    struct proc *idle = &idle_procs[c->id];
+    idle->pid = 0;
+    idle->state = RUNNING;
+    idle->is_idle = 1;
+    c->proc = idle;
+
+    // Create a dummy trap frame to keep things clean
+    memset(&idle->tf, 0, sizeof(idle->tf));
+    idle->tf.sepc = (ulong)idle_loop;
+}
 
 void
 test_syscall()
 {
-    syscall3(SYS_write, (long)"Hello from wrapped syscall!\n", 0, 0);
+    const char *msg = "Hello from write syscall!\n";
+    syscall3(SYS_write, 1, (long)msg, strlen(msg));
     syscall0(SYS_exit); // Halts the system
 }
 
@@ -26,8 +41,12 @@ s_mode_main()
     uart_puts(": Hello from S-mode!\n");
     spin_unlock(&uart_lock);
 
+    // Create idle process for each CPU
+    setup_idle_proc();
+
     // Test trap call
     if (curr_cpu()->id == 0) {
+        static struct proc test_proc;
         test_proc.pid = 1;
         test_proc.state = RUNNING;
         curr_cpu()->proc = &test_proc;
@@ -57,25 +76,23 @@ start()
     //write_csr(sie, sie | (1L << 9) | (1L << 5) | (1L << 1));
 
     // Setup PMP to give S-mode access to all memory
-    write_csr(pmpaddr0, -1L);     // Top of memory range (all memory)
-    write_csr(pmpcfg0, 0x0f);     // R/W/X permissions, TOR mode
+    write_csr(pmpaddr0, -1L);   // Top of memory range (all memory)
+    write_csr(pmpcfg0, 0x0f);   // R/W/X permissions, TOR mode
 
     // Set S-mode trap vector
     write_csr(stvec, s_trap_vector);
 
     // Set up mstatus to enter S-mode
-    ulong mstatus = read_csr(mstatus);
-    mstatus &= ~(3UL << 11);      // Clear MPP
-    mstatus |= (1UL << 11);       // Set MPP = S-mode (01)
-    write_csr(mstatus, mstatus);
+    clear_csr(mstatus, MSTATUS_MPP_MASK);  // Clear MPP (bits 12-11)
+    set_csr(mstatus, MSTATUS_MPP_S_MODE);  // Set MPP = S-mode (01)
 
     // Enable interrupts in S-mode
-    write_csr(sstatus, read_csr(sstatus) | (1L << 1));
+    set_csr(sstatus, SSTATUS_SIE);
 
     // Init timer interrupts
-    write_csr(sie, read_csr(sie) | (1L << 5));
-    write_csr(menvcfg, read_csr(menvcfg) | (1L << 63));
-    write_csr(mcounteren, read_csr(mcounteren) | (1L << 1));
+    set_csr(sie, SIE_STIE);
+    set_csr(menvcfg, MENVCFG_FDT);
+    set_csr(mcounteren, MCOUNTEREN_TIME);
     timer_init();
 
     // Optional: disable paging for now

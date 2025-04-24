@@ -2,6 +2,12 @@
 
 #include "../types.h"
 
+#define SCAUSE_IRQ_BIT           (1UL << 63)
+#define SCAUSE_CODE(scause)      ((scause) & ~SCAUSE_IRQ_BIT)
+#define SCAUSE_USER_ECALL        8  // U-mode system call
+#define SCAUSE_SUPERVISOR_ECALL  9  // S-mode system call
+#define SCAUSE_TIMER_INTERRUPT   5  // Timer interrupt
+
 typedef struct trap_frame {
     ulong regs[32];     // x0 - x31
     ulong sepc;         // saved program counter

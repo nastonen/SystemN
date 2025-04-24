@@ -6,6 +6,14 @@
 #define NCPU   4  // number of CPUs
 #define NPROC 64  // max number of processes
 
+void idle_loop();
+
+static inline struct cpu *
+curr_cpu()
+{
+    return (struct cpu*)read_tp();
+}
+
 enum proc_state {
     UNUSED,
     SLEEPING,
@@ -18,9 +26,9 @@ struct proc {
     int pid;
     enum proc_state state;
     trap_frame_t tf;
+    int is_idle;
 };
 
-extern struct proc proc_table[NPROC];
 
 struct cpu {
     uint id;            // hard ID
@@ -30,9 +38,5 @@ struct cpu {
 };
 
 extern struct cpu cpus[NCPU];
-
-static inline struct cpu *
-curr_cpu()
-{
-    return (struct cpu*)read_tp();
-}
+extern struct proc proc_table[NPROC];
+extern struct proc idle_procs[NCPU];  // One idle process per CPU

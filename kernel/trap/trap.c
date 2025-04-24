@@ -7,9 +7,6 @@
 #include "../syscall.h"
 #include "../string.h"
 
-#define SCAUSE_IRQ_BIT      (1UL << 63)
-#define SCAUSE_CODE(scause) ((scause) & ~SCAUSE_IRQ_BIT)
-
 void
 syscall_handler(struct proc *p)
 {
@@ -19,19 +16,27 @@ syscall_handler(struct proc *p)
     switch(syscall_num) {
         case SYS_write:
             // 'write' syscall: arguments in a0 (fd), a1 (buffer), a2 (size)
+            int fd = tf->regs[10];                  // a0
+            const char *buf = (char*)tf->regs[11];  // a1
+            ulong len = tf->regs[12];               // a2
+
+            if (fd != 1 && fd != 2) {
+                tf->regs[10] = -1;   // error (unsupported fd)
+                break;
+            }
+
             spin_lock(&uart_lock);
-            uart_puts((char*)tf->regs[10]);
+            uart_puts(buf);
             spin_unlock(&uart_lock);
-            tf->regs[10] = 0;
+            tf->regs[10] = len; // return number of bytes written
             break;
         case SYS_exit:
             spin_lock(&uart_lock);
             uart_puts("Exiting program...\n");
             spin_unlock(&uart_lock);
-            /*while (1) {
-                asm volatile("wfi"); // Halt the system (for now)
-                uart_puts("wfi...\n");
-            }*/
+
+            struct cpu *c = curr_cpu();
+            c->proc = &idle_procs[c->id];
             break;
         case SYS_getpid:
             tf->regs[10] = p->pid; //curr_cpu()->id; // Return hart_id as PID for now
@@ -56,12 +61,21 @@ s_trap_handler(trap_frame_t *tf)
     struct cpu *c = curr_cpu();
     struct proc *p = c->proc;
 
+    // Timer interrupt on idle core
+    if (p->is_idle && (cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
+        timer_handle();
+        return;
+    }
+
+    // This shouldn't happen: every CPU should have a proc (idle or otherwise)
     if (!p) {
         // Timer interrupt
-        if ((cause & SCAUSE_IRQ_BIT) && code == 5) {
+        if ((cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
             timer_handle();
             return;
         }
+
+        // Weird - should not happen
         spin_lock(&uart_lock);
         uart_puts("No current process for CPU ");
         uart_putc('0' + c->id);
@@ -71,13 +85,20 @@ s_trap_handler(trap_frame_t *tf)
             asm volatile("wfi");
     }
 
+    // Capture original process
+    struct proc *orig_proc = p;
+
     // Save incoming trap frame into the process
     memcpy(&p->tf, tf, sizeof(*tf));
 
-    /* Debug
+    // Enable interrupts (allow preemption)
+    set_csr(sstatus, SSTATUS_SIE);
+
+    // Debug
+    /*
     spin_lock(&uart_lock);
     uart_puts("Trap frame at: ");
-    uart_puthex((ulong)p->tf);
+    uart_puthex((ulong)&p->tf);
     uart_putc('\n');
     uart_puts("scause: ");
     uart_puthex(p->tf.scause);
@@ -85,7 +106,7 @@ s_trap_handler(trap_frame_t *tf)
     spin_unlock(&uart_lock);
     */
 
-    if (code == 8) {
+    if (code == SCAUSE_USER_ECALL) {
         // User-mode (U-mode)
         spin_lock(&uart_lock);
         uart_puts("[S] U-mode system call received\n");
@@ -93,7 +114,7 @@ s_trap_handler(trap_frame_t *tf)
         //write_csr(sepc, epc + 4); // skip 'ecall'
         p->tf.sepc += 4;
         syscall_handler(p);
-    } else if (code == 9) {
+    } else if (code == SCAUSE_SUPERVISOR_ECALL) {
         // Supervisor-mode (S-mode)
         spin_lock(&uart_lock);
         uart_puts("[S] S-mode system call received\n");
@@ -104,7 +125,7 @@ s_trap_handler(trap_frame_t *tf)
         //write_csr(sepc, epc + 4); // skip 'ecall'
         p->tf.sepc += 4;
         syscall_handler(p);
-    } else if ((cause & SCAUSE_IRQ_BIT) && code == 5) {
+    } else if ((cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
         // Timer interrupt
         timer_handle();
 
@@ -125,7 +146,9 @@ s_trap_handler(trap_frame_t *tf)
             asm volatile("wfi");
     }
 
-    // Restore trap_frame
-    memcpy(tf, &p->tf, sizeof(*tf));
+    // Disable interrupts
+    clear_csr(sstatus, SSTATUS_SIE);
 
+    // Restore trap frame
+    memcpy(tf, &orig_proc->tf, sizeof(*tf));
 }
