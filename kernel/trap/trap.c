@@ -34,9 +34,6 @@ syscall_handler(struct proc *p)
             spin_lock(&uart_lock);
             uart_puts("Exiting program...\n");
             spin_unlock(&uart_lock);
-
-            struct cpu *c = curr_cpu();
-            c->proc = &idle_procs[c->id];
             break;
         case SYS_getpid:
             tf->regs[10] = p->pid; //curr_cpu()->id; // Return hart_id as PID for now
@@ -62,7 +59,7 @@ s_trap_handler(trap_frame_t *tf)
     struct proc *p = c->proc;
 
     // Timer interrupt on idle core
-    if (p->is_idle && (cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
+    if (p && p->is_idle && (cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
         timer_handle();
         return;
     }
@@ -86,13 +83,21 @@ s_trap_handler(trap_frame_t *tf)
     }
 
     // Capture original process
-    struct proc *orig_proc = p;
+    //struct proc *orig_proc = p;
+
+    /*
+    spin_lock(&uart_lock);
+    uart_puts("Before saving tf: p->tf.sepc = ");
+    uart_puthex(p->tf.sepc);
+    uart_putc('\n');
+    spin_unlock(&uart_lock);
+    */
 
     // Save incoming trap frame into the process
     memcpy(&p->tf, tf, sizeof(*tf));
 
     // Enable interrupts (allow preemption)
-    set_csr(sstatus, SSTATUS_SIE);
+    //set_csr(sstatus, SSTATUS_SIE);
 
     // Debug
     /*
@@ -106,49 +111,79 @@ s_trap_handler(trap_frame_t *tf)
     spin_unlock(&uart_lock);
     */
 
-    if (code == SCAUSE_USER_ECALL) {
-        // User-mode (U-mode)
-        spin_lock(&uart_lock);
-        uart_puts("[S] U-mode system call received\n");
-        spin_unlock(&uart_lock);
-        //write_csr(sepc, epc + 4); // skip 'ecall'
-        p->tf.sepc += 4;
-        syscall_handler(p);
-    } else if (code == SCAUSE_SUPERVISOR_ECALL) {
-        // Supervisor-mode (S-mode)
-        spin_lock(&uart_lock);
-        uart_puts("[S] S-mode system call received\n");
-        //uart_puts("TF a7 = ");
-        //uart_puthex(p->tf.regs[17]);  // a7
-        //uart_putc('\n');
-        spin_unlock(&uart_lock);
-        //write_csr(sepc, epc + 4); // skip 'ecall'
-        p->tf.sepc += 4;
-        syscall_handler(p);
-    } else if ((cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
-        // Timer interrupt
-        timer_handle();
+    switch (code) {
+        case SCAUSE_USER_ECALL:
+            // User-mode (U-mode)
+            spin_lock(&uart_lock);
+            uart_puts("[S] U-mode system call received\n");
+            spin_unlock(&uart_lock);
+            //write_csr(sepc, epc + 4); // skip 'ecall'
+            p->tf.sepc += 4;
+            syscall_handler(p);
+            break;
+        case SCAUSE_SUPERVISOR_ECALL:
+            // Supervisor-mode (S-mode)
+            spin_lock(&uart_lock);
+            uart_puts("[S] S-mode system call received\n");
+            //uart_puts("TF a7 = ");
+            //uart_puthex(p->tf.regs[17]);  // a7
+            //uart_putc('\n');
+            spin_unlock(&uart_lock);
+            //write_csr(sepc, epc + 4); // skip 'ecall'
+            p->tf.sepc += 4;
+            syscall_handler(p);
+            break;
+        case SCAUSE_TIMER_INTERRUPT:
+            // Timer interrupt
+            if (cause & SCAUSE_IRQ_BIT) {
+                timer_handle();
+                /*
+                spin_lock(&uart_lock);
+                uart_putc('0' + c->id);
+                uart_puts(": [S] Timer interrupt received\n");
+                spin_unlock(&uart_lock);
+                */
+            }
+            break;
+        case SCAUSE_SUPERVISOR_IRQ: // Supervisor Software Interrupt
+            spin_lock(&uart_lock);
+            uart_putc('0' + c->id);
+            uart_puts(": [S] Supervisor Software Interrupt\n");
+            spin_unlock(&uart_lock);
 
-        /*
-        spin_lock(&uart_lock);
-        uart_putc('0' + c->id);
-        uart_puts(": [S] Timer interrupt received\n");
-        spin_unlock(&uart_lock);
-        */
-    } else {
-        spin_lock(&uart_lock);
-        uart_puts("[S] Unknown trap! cause=");
-        uart_puthex(cause);
-        uart_puts("\nHalting.\n");
-        spin_unlock(&uart_lock);
-
-        while (1)
-            asm volatile("wfi");
+            // Clear SSIP manually to avoid re-entering
+            clear_csr(sip, (1 << 1));
+            break;
+        case SCAUSE_ILLEGAL_INSTR:
+            spin_lock(&uart_lock);
+            uart_puts("CPU ");
+            uart_putc('0' + c->id);
+            uart_puts(": [S] Illegal instruction at ");
+            uart_puthex(tf->sepc);
+            uart_putc('\n');
+            spin_unlock(&uart_lock);
+            break;
+        default:
+            spin_lock(&uart_lock);
+            uart_puts("[S] Unknown trap! cause=");
+            uart_puthex(cause);
+            uart_puts("\nHalting.\n");
+            spin_unlock(&uart_lock);
+            while (1)
+                asm volatile("wfi");
     }
 
     // Disable interrupts
-    clear_csr(sstatus, SSTATUS_SIE);
+    //clear_csr(sstatus, SSTATUS_SIE);
+
+    /*
+    spin_lock(&uart_lock);
+    uart_puts("Before restoring tf: tf->sepc = ");
+    uart_puthex(p->tf.sepc);
+    uart_putc('\n');
+    spin_unlock(&uart_lock);
+    */
 
     // Restore trap frame
-    memcpy(tf, &orig_proc->tf, sizeof(*tf));
+    memcpy(tf, &p->tf, sizeof(*tf));
 }

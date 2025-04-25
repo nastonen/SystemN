@@ -3,6 +3,9 @@
 #include "types.h"
 
 #define SSTATUS_SIE         (1UL << 1)
+#define SSTATUS_SPIE        (1L << 5)
+#define SSTATUS_SPP         (1 << 8)
+
 #define SIE_STIE            (1L << 5)
 #define MENVCFG_FDT         (1L << 63)
 #define MCOUNTEREN_TIME     (1L << 1)

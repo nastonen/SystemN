@@ -9,18 +9,41 @@
 #include "string.h"
 
 void
+restore_and_sret(trap_frame_t *tf)
+{
+    // Restore sstatus and sepc from the trap frame
+    write_csr(sstatus, tf->sstatus);
+    write_csr(sepc, tf->sepc);
+
+    // Restore general-purpose registers (if needed)
+    // Minimal one — expand later
+    register ulong a0 asm("a0") = tf->regs[10];  // return value register
+
+    asm volatile(
+        "mv a0, %0\n"     // move a0 back
+        "sret\n"          // return to tf->sepc in S-mode
+        :                 // outputs
+        : "r"(a0)         // inputs
+        : "memory"        // clobbers
+    );
+}
+
+void
 setup_idle_proc()
 {
     struct cpu *c = curr_cpu();
     struct proc *idle = &idle_procs[c->id];
+
     idle->pid = 0;
     idle->state = RUNNING;
     idle->is_idle = 1;
-    c->proc = idle;
 
     // Create a dummy trap frame to keep things clean
     memset(&idle->tf, 0, sizeof(idle->tf));
     idle->tf.sepc = (ulong)idle_loop;
+    idle->tf.sstatus = SSTATUS_SPIE | SSTATUS_SPP;
+
+    c->proc = idle;
 }
 
 void
@@ -28,7 +51,7 @@ test_syscall()
 {
     const char *msg = "Hello from write syscall!\n";
     syscall3(SYS_write, 1, (long)msg, strlen(msg));
-    syscall0(SYS_exit); // Halts the system
+    //syscall0(SYS_exit); // Halts the system
 }
 
 void
@@ -41,9 +64,6 @@ s_mode_main()
     uart_puts(": Hello from S-mode!\n");
     spin_unlock(&uart_lock);
 
-    // Create idle process for each CPU
-    setup_idle_proc();
-
     // Test trap call
     if (curr_cpu()->id == 0) {
         static struct proc test_proc;
@@ -54,8 +74,12 @@ s_mode_main()
         test_syscall();
     }
 
-    while (1)
-        asm volatile("wfi");
+    // Create idle process for each CPU
+    setup_idle_proc();
+    restore_and_sret(&curr_cpu()->proc->tf);
+
+    //while (1)
+      //  asm volatile("wfi");
 }
 
 void
@@ -68,6 +92,15 @@ start()
     // Set hart_id to struct cpu
     struct cpu *c = curr_cpu();
     c->id = hart_id;
+
+    // Halt all harts except 0
+    /*
+    if (hart_id != 0) {
+        while (1) {
+            asm volatile("wfi");
+        }
+    }
+    */
 
     // Delegate exceptions and interrupts to S-mode
     write_csr(medeleg, 0xffff);
