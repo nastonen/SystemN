@@ -1,4 +1,2 @@
 - 'write' syscall to print whole string at a time
 - max number of processes?
-- shell
-- scheduler

@@ -3,12 +3,13 @@
 #include "types.h"
 
 #define SSTATUS_SIE         (1UL << 1)
-#define SSTATUS_SPIE        (1L << 5)
-#define SSTATUS_SPP         (1 << 8)
+#define SSTATUS_SPP         (1UL << 8)
+#define SSTATUS_SPIE        (1UL << 5)
+#define SSTATUS_UPIE        (0UL << 8)
 
-#define SIE_STIE            (1L << 5)
-#define MENVCFG_FDT         (1L << 63)
-#define MCOUNTEREN_TIME     (1L << 1)
+#define SIE_STIE            (1UL << 5)
+#define MENVCFG_FDT         (1UL << 63)
+#define MCOUNTEREN_TIME     (1UL << 1)
 #define MSTATUS_MPP_MASK    (3UL << 11)  // Mask for MPP (bits 11-12)
 #define MSTATUS_MPP_S_MODE  (1UL << 11)  // MPP set to S-mode (01)
 

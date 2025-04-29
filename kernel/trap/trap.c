@@ -6,6 +6,7 @@
 #include "../timer.h"
 #include "../syscall.h"
 #include "../string.h"
+#include "../sched.h"
 
 void
 syscall_handler(struct proc *p)
@@ -13,12 +14,19 @@ syscall_handler(struct proc *p)
     trap_frame_t *tf = &p->tf;
     int syscall_num = tf->regs[17]; // a7 (syscall number)
 
+    int fd;
+    ulong len;
+
     switch (syscall_num) {
     case SYS_write:
         // 'write' syscall: arguments in a0 (fd), a1 (buffer), a2 (size)
-        int fd = tf->regs[10];                  // a0
+        spin_lock(&uart_lock);
+        uart_puts("SYS_write\n");
+        spin_unlock(&uart_lock);
+
+        fd = tf->regs[10];                      // a0
         const char *buf = (char*)tf->regs[11];  // a1
-        ulong len = tf->regs[12];               // a2
+        len = tf->regs[12];                     // a2
 
         if (fd != 1 && fd != 2) {
             tf->regs[10] = -1;   // error (unsupported fd)
@@ -30,6 +38,24 @@ syscall_handler(struct proc *p)
         spin_unlock(&uart_lock);
         tf->regs[10] = len; // return number of bytes written
         break;
+    case SYS_read:
+        spin_lock(&uart_lock);
+        uart_puts("SYS_read()\n");
+        spin_unlock(&uart_lock);
+
+        fd = tf->regs[10];                      // a0
+        char *buf1 = (char *)tf->regs[11];      // a1
+        len = tf->regs[12];                     // a2
+
+        if (fd == 0) {// stdin
+            spin_lock(&uart_lock);
+            uart_puts("waiting for uart_gets()...\n");
+            spin_unlock(&uart_lock);
+            tf->regs[10] = uart_gets(buf1, len); // return number of bytes read
+        } else {
+            tf->regs[10] = -1; // invalid
+        }
+        break;
     case SYS_exit:
         spin_lock(&uart_lock);
         uart_puts("Exiting program...\n");
@@ -38,9 +64,16 @@ syscall_handler(struct proc *p)
     case SYS_getpid:
         tf->regs[10] = p->pid; //curr_cpu()->id; // Return hart_id as PID for now
         break;
+    case SYS_yield:
+        spin_lock(&uart_lock);
+        uart_puts("yield()...\n");
+        spin_unlock(&uart_lock);
+        p->state = RUNNABLE;
+        schedule(); // yield and pick someone else
+        break;
     default:
         spin_lock(&uart_lock);
-        uart_puts("Unknown syscall number: \n");
+        uart_puts("Unknown syscall number: ");
         uart_puthex(syscall_num);
         uart_putc('\n');
         spin_unlock(&uart_lock);
@@ -52,6 +85,12 @@ syscall_handler(struct proc *p)
 void
 s_trap_handler(trap_frame_t *tf)
 {
+    //spin_lock(&uart_lock);
+    //uart_puts("Trap: ");
+    //uart_puthex(SCAUSE_CODE(tf->scause));
+    //uart_puts("\n");
+    //spin_unlock(&uart_lock);
+
     ulong cause = tf->scause;
     ulong code  = SCAUSE_CODE(cause);
 
@@ -150,9 +189,7 @@ s_trap_handler(trap_frame_t *tf)
         uart_putc('0' + c->id);
         uart_puts(": [S] Supervisor Software Interrupt\n");
         spin_unlock(&uart_lock);
-
-        // Clear SSIP manually to avoid re-entering
-        //clear_csr(sip, (1 << 1));
+        while(1);
         break;
     case SCAUSE_ILLEGAL_INSTR:
         spin_lock(&uart_lock);
@@ -162,6 +199,7 @@ s_trap_handler(trap_frame_t *tf)
         uart_puthex(tf->sepc);
         uart_putc('\n');
         spin_unlock(&uart_lock);
+        while(1);
         break;
     default:
         spin_lock(&uart_lock);
@@ -186,4 +224,63 @@ s_trap_handler(trap_frame_t *tf)
 
     // Restore trap frame
     memcpy(tf, &p->tf, sizeof(*tf));
+}
+
+void
+restore_and_sret(trap_frame_t *tf)
+{
+    spin_lock(&uart_lock);
+    uart_puts(">> restore_and_sret()\n");
+    spin_unlock(&uart_lock);
+
+    write_csr(sstatus, tf->sstatus);
+    write_csr(sepc, tf->sepc);
+
+    spin_lock(&uart_lock);
+    uart_puts(">> About to sret to PC = ");
+    uart_puthex(tf->sepc);
+    uart_putc('\n');
+    uart_puts(">> sp = ");
+    uart_puthex(tf->regs[2]);
+    uart_putc('\n');
+    spin_unlock(&uart_lock);
+
+    asm volatile(
+        // Restore registers from tf->regs[]
+        "ld ra, 8*1(%0)\n"
+        "ld sp, 8*2(%0)\n"
+        "ld gp, 8*3(%0)\n"
+        "ld tp, 8*4(%0)\n"
+        "ld t0, 8*5(%0)\n"
+        "ld t1, 8*6(%0)\n"
+        "ld t2, 8*7(%0)\n"
+        "ld s0, 8*8(%0)\n"
+        "ld s1, 8*9(%0)\n"
+        "ld a0, 8*10(%0)\n"
+        "ld a1, 8*11(%0)\n"
+        "ld a2, 8*12(%0)\n"
+        "ld a3, 8*13(%0)\n"
+        "ld a4, 8*14(%0)\n"
+        "ld a5, 8*15(%0)\n"
+        "ld a6, 8*16(%0)\n"
+        "ld a7, 8*17(%0)\n"
+        "ld s2, 8*18(%0)\n"
+        "ld s3, 8*19(%0)\n"
+        "ld s4, 8*20(%0)\n"
+        "ld s5, 8*21(%0)\n"
+        "ld s6, 8*22(%0)\n"
+        "ld s7, 8*23(%0)\n"
+        "ld s8, 8*24(%0)\n"
+        "ld s9, 8*25(%0)\n"
+        "ld s10, 8*26(%0)\n"
+        "ld s11, 8*27(%0)\n"
+        "ld t3, 8*28(%0)\n"
+        "ld t4, 8*29(%0)\n"
+        "ld t5, 8*30(%0)\n"
+        "ld t6, 8*31(%0)\n"
+        "sret\n"
+        :
+        : "r"(tf->regs)
+        : "memory"
+    );
 }

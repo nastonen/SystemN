@@ -9,13 +9,13 @@ OBJDUMP = $(CROSS)objdump
 
 # Files
 OBJS = entry.o start.o uart.o spinlock.o proc.o trap/trap.o \
-       trap/trap_vec.o string.o
+       trap/trap_vec.o string.o sched.o swtch.o shell.o
 TARGET = kernel
 LINKER = kernel.ld
 
 # Flags
 CFLAGS = -march=rv64g -mabi=lp64 -nostdlib -fno-pic -mno-relax \
-         -mcmodel=medany -Wall -Wextra -O0
+         -mcmodel=medany -Wall -Wextra -O0 -g
 LDFLAGS = -T $(LINKER)
 
 all: $(TARGET).bin
@@ -50,6 +50,7 @@ run: $(TARGET).bin
                         -serial stdio \
                         -display none \
                         -kernel $(TARGET).bin
+#                        -S -gdb tcp::1234
 
 clean:
 	rm -f $(shell find . -name '*.o' -o -name '*.elf' -o -name '*.bin' -o -name '*.asm')

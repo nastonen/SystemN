@@ -7,25 +7,69 @@
 #include "timer.h"
 #include "syscall.h"
 #include "string.h"
+#include "sched.h"
+#include "shell.h"
+
+//char shell_stack[4096]; // 4 KiB user stack
+extern char _binary_shell_bin_start[];
+extern char _binary_shell_bin_end[];
+
+#define USER_CODE_START 0x80020000
+#define USER_STACK_SIZE 4096
+
+//char user_stack[USER_STACK_SIZE];
+#define user_stack (USER_CODE_START + 0x1000)
 
 void
-restore_and_sret(trap_frame_t *tf)
+proc_trampoline()
 {
-    // Restore sstatus and sepc from the trap frame
-    write_csr(sstatus, tf->sstatus);
-    write_csr(sepc, tf->sepc);
+    spin_lock(&uart_lock);
+    uart_puts(">> Entered proc_trampoline()\n");
+    spin_unlock(&uart_lock);
 
-    // Restore general-purpose registers (if needed)
-    // Minimal one — expand later
-    register ulong a0 asm("a0") = tf->regs[10];  // return value register
+    struct proc *p = curr_cpu()->proc;
+    restore_and_sret(&p->tf);  // This will drop into user mode at tf.sepc
 
-    asm volatile(
-        "mv a0, %0\n"     // move a0 back
-        "sret\n"          // return to tf->sepc in S-mode
-        :                 // outputs
-        : "r"(a0)         // inputs
-        : "memory"        // clobbers
-    );
+    spin_lock(&uart_lock);
+    uart_puts(">> Return from proc_trampoline()\n");
+    spin_unlock(&uart_lock);
+}
+
+
+void
+shell_init()
+{
+    struct proc *p = &proc_table[0];
+    memset(p, 0, sizeof(*p));
+    p->pid = 1;
+    p->bound_cpu = 0; // remember to set to -1 by default
+    p->state = RUNNABLE;
+    //p->is_idle = 0;
+
+    // Copy user code to USER_CODE_START
+    uint user_code_size = _binary_shell_bin_end - _binary_shell_bin_start;
+    memcpy((void *)USER_CODE_START, _binary_shell_bin_start, user_code_size);
+
+    spin_lock(&uart_lock);
+    uart_puts("Shell code copied to ");
+    uart_puthex(USER_CODE_START);
+    uart_puts("\nFirst 4 bytes: ");
+    uint *p1 = (uint *)USER_CODE_START;
+    uart_puthex(p1[0]);
+    uart_puts("\n");
+    spin_unlock(&uart_lock);
+
+    // Set up trap frame
+    memset(&p->tf, 0, sizeof(p->tf));
+    p->tf.sepc = USER_CODE_START; //(ulong)user_shell_main;
+    p->tf.sstatus = SSTATUS_SPIE; // | SSTATUS_UPIE; // SPP=0 -> user mode
+    //p->tf.regs[2] = (ulong)(shell_stack + sizeof(shell_stack));
+    p->tf.regs[2] = (ulong)user_stack; // (user_stack + USER_STACK_SIZE);  // User stack pointer
+
+    // Set context
+    p->ctx.ra = (ulong)proc_trampoline;
+    //p->ctx.sp = (ulong)(shell_stack + sizeof(shell_stack));
+    p->ctx.sp = (user_stack + USER_STACK_SIZE); // optional
 }
 
 void
@@ -43,15 +87,33 @@ setup_idle_proc()
     idle->tf.sepc = (ulong)idle_loop;
     idle->tf.sstatus = SSTATUS_SPIE | SSTATUS_SPP;
 
+    // Set context
+    idle->ctx.ra = (ulong)idle_loop;
+    idle->ctx.sp = (ulong)&idle_stack[c->id][1024];
+
     c->proc = idle;
 }
 
-void
-test_syscall()
+void jump_to_user_shell()
 {
-    const char *msg = "Hello from write syscall!\n";
-    syscall3(SYS_write, 1, (long)msg, strlen(msg));
-    //syscall0(SYS_exit); // Halts the system
+    ulong user_pc = USER_CODE_START; //0x80020000;      // shell binary entry
+    ulong user_sp = user_stack; //0x80021000;      // user stack top
+
+    // Setup SSTATUS: SPIE=1 (enable interrupts), SPP=0 (user mode)
+    ulong sstatus = SSTATUS_SPIE;
+    write_csr(sstatus, sstatus);
+
+    write_csr(sepc, user_pc);        // Set exception return PC
+
+    // Set up user registers (only sp is required here)
+    register ulong sp asm("sp") = user_sp;
+    asm volatile(
+        "mv sp, %0\n"
+        "sret\n"
+        :
+        : "r"(sp)
+        : "memory"
+    );
 }
 
 void
@@ -64,22 +126,38 @@ s_mode_main()
     uart_puts(": Hello from S-mode!\n");
     spin_unlock(&uart_lock);
 
-    // Test trap call
-    if (curr_cpu()->id == 0) {
-        static struct proc test_proc;
-        test_proc.pid = 1;
-        test_proc.state = RUNNING;
-        curr_cpu()->proc = &test_proc;
-
-        test_syscall();
-    }
-
     // Create idle process for each CPU
     setup_idle_proc();
-    restore_and_sret(&curr_cpu()->proc->tf);
 
-    //while (1)
-      //  asm volatile("wfi");
+    // Test trap call
+    if (curr_cpu()->id == 0) {
+        shell_init();
+
+        // Manually?
+        //struct proc *p = &proc_table[0];
+        //restore_and_sret(&p->tf);
+    }
+
+    jump_to_user_shell();
+
+    /*
+    spin_lock(&uart_lock);
+    uart_puts("tf->sstatus: ");
+    uart_puthex(curr_cpu()->proc->tf.sstatus);
+    uart_puts("\n");
+    spin_unlock(&uart_lock);
+    schedule();
+    */
+    // called in trampoline!
+    //restore_and_sret(&curr_cpu()->proc->tf);
+
+    while (1) {
+        spin_lock(&uart_lock);
+        uart_puts("End of s_mode_main()\n");
+        spin_unlock(&uart_lock);
+
+        asm volatile("wfi");
+    }
 }
 
 void
@@ -94,13 +172,11 @@ start()
     c->id = hart_id;
 
     // Halt all harts except 0
-    /*
     if (hart_id != 0) {
         while (1) {
             asm volatile("wfi");
         }
     }
-    */
 
     // Delegate exceptions and interrupts to S-mode
     write_csr(medeleg, 0xffff);

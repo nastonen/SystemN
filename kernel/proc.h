@@ -14,6 +14,24 @@ curr_cpu()
     return (struct cpu*)read_tp();
 }
 
+typedef struct context_t {
+    ulong ra;
+    ulong sp;
+
+    ulong s0;
+    ulong s1;
+    ulong s2;
+    ulong s3;
+    ulong s4;
+    ulong s5;
+    ulong s6;
+    ulong s7;
+    ulong s8;
+    ulong s9;
+    ulong s10;
+    ulong s11;
+} context_t;
+
 enum proc_state {
     UNUSED,
     SLEEPING,
@@ -25,8 +43,10 @@ enum proc_state {
 struct proc {
     int pid;
     enum proc_state state;
-    trap_frame_t tf;
     int is_idle;
+    int bound_cpu;
+    trap_frame_t tf;
+    context_t ctx;
 };
 
 
@@ -40,3 +60,4 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern struct proc proc_table[NPROC];
 extern struct proc idle_procs[NCPU];  // One idle process per CPU
+extern char idle_stack[NCPU][1024];
