@@ -3,8 +3,9 @@
 #include "riscv.h"
 #include "trap/trap.h"
 
-#define NCPU   4  // number of CPUs
-#define NPROC 64  // max number of processes
+#define NCPU        4  // number of CPUs
+#define NPROC       64  // max number of processes
+#define KSTACK_SIZE 4096
 
 void idle_loop();
 
@@ -17,19 +18,7 @@ curr_cpu()
 typedef struct context_t {
     ulong ra;
     ulong sp;
-
-    ulong s0;
-    ulong s1;
-    ulong s2;
-    ulong s3;
-    ulong s4;
-    ulong s5;
-    ulong s6;
-    ulong s7;
-    ulong s8;
-    ulong s9;
-    ulong s10;
-    ulong s11;
+    ulong s[12];
 } context_t;
 
 enum proc_state {
@@ -45,7 +34,8 @@ struct proc {
     enum proc_state state;
     int is_idle;
     int bound_cpu;
-    trap_frame_t tf;
+    char kstack[KSTACK_SIZE];
+    trap_frame_t *tf;
     context_t ctx;
 };
 
@@ -60,4 +50,3 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern struct proc proc_table[NPROC];
 extern struct proc idle_procs[NCPU];  // One idle process per CPU
-extern char idle_stack[NCPU][1024];

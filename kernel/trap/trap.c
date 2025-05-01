@@ -11,7 +11,7 @@
 void
 syscall_handler(struct proc *p)
 {
-    trap_frame_t *tf = &p->tf;
+    trap_frame_t *tf = p->tf;
     int syscall_num = tf->regs[17]; // a7 (syscall number)
 
     int fd;
@@ -85,22 +85,51 @@ syscall_handler(struct proc *p)
 void
 s_trap_handler(trap_frame_t *tf)
 {
-    //spin_lock(&uart_lock);
-    //uart_puts("Trap: ");
-    //uart_puthex(SCAUSE_CODE(tf->scause));
-    //uart_puts("\n");
-    //spin_unlock(&uart_lock);
-
-    ulong cause = tf->scause;
-    ulong code  = SCAUSE_CODE(cause);
-
     struct cpu *c = curr_cpu();
     struct proc *p = c->proc;
 
-    // Timer interrupt on idle core
-    if (p && p->is_idle && (cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
-        timer_handle();
-        return;
+    ulong cause = read_csr(scause);
+    ulong code  = SCAUSE_CODE(cause);
+
+    // Must not access tf on idle process, it is NULL!
+    if (p && p->is_idle) {
+        // Timer interrupt on idle core
+        if ((cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
+            timer_handle();
+            return;
+        } else {
+            spin_lock(&uart_lock);
+            uart_puts("Trap on idle core? Should not happen, Halting...\n");
+            spin_unlock(&uart_lock);
+            while (1)
+                asm volatile("wfi");
+        }
+    }
+
+    /*
+    spin_lock(&uart_lock);
+    uart_puts("Trap: ");
+    uart_puthex(code);
+    uart_putc('\n');
+
+    uart_puts("sepc: ");
+    uart_puthex(read_csr(sepc));
+    uart_puts("\n");
+
+    uart_puts("stval: ");
+    uart_puthex(read_csr(stval));
+    uart_puts("\n");
+    spin_unlock(&uart_lock);
+    */
+
+    if (SCAUSE_CODE(tf->scause) == 5 && !(tf->scause & SCAUSE_IRQ_BIT)) {
+        spin_lock(&uart_lock);
+        uart_puts("Trap: ");
+        uart_puthex(SCAUSE_CODE(tf->scause));
+        uart_puts("\n");
+        spin_unlock(&uart_lock);
+        while (1)
+            ;
     }
 
     // This shouldn't happen: every CPU should have a proc (idle or otherwise)
@@ -132,8 +161,7 @@ s_trap_handler(trap_frame_t *tf)
     spin_unlock(&uart_lock);
     */
 
-    // Save incoming trap frame into the process
-    memcpy(&p->tf, tf, sizeof(*tf));
+    p->tf = tf;
 
     // Enable interrupts (allow preemption)
     //set_csr(sstatus, SSTATUS_SIE);
@@ -156,8 +184,7 @@ s_trap_handler(trap_frame_t *tf)
         spin_lock(&uart_lock);
         uart_puts("[S] U-mode system call received\n");
         spin_unlock(&uart_lock);
-        //write_csr(sepc, epc + 4); // skip 'ecall'
-        p->tf.sepc += 4;
+        p->tf->sepc += 4;
         syscall_handler(p);
         break;
     case SCAUSE_SUPERVISOR_ECALL:
@@ -168,8 +195,7 @@ s_trap_handler(trap_frame_t *tf)
         //uart_puthex(p->tf.regs[17]);  // a7
         //uart_putc('\n');
         spin_unlock(&uart_lock);
-        //write_csr(sepc, epc + 4); // skip 'ecall'
-        p->tf.sepc += 4;
+        p->tf->sepc += 4;
         syscall_handler(p);
         break;
     case SCAUSE_TIMER_INTERRUPT:
@@ -196,7 +222,7 @@ s_trap_handler(trap_frame_t *tf)
         uart_puts("CPU ");
         uart_putc('0' + c->id);
         uart_puts(": [S] Illegal instruction at ");
-        uart_puthex(tf->sepc);
+        uart_puthex(p->tf->sepc);
         uart_putc('\n');
         spin_unlock(&uart_lock);
         while(1);
@@ -216,14 +242,11 @@ s_trap_handler(trap_frame_t *tf)
 
     /*
     spin_lock(&uart_lock);
-    uart_puts("Before restoring tf: tf->sepc = ");
+    uart_puts("Before restoring tf: p->tf->sepc = ");
     uart_puthex(p->tf.sepc);
     uart_putc('\n');
     spin_unlock(&uart_lock);
     */
-
-    // Restore trap frame
-    memcpy(tf, &p->tf, sizeof(*tf));
 }
 
 void
@@ -236,11 +259,15 @@ restore_and_sret(trap_frame_t *tf)
     write_csr(sstatus, tf->sstatus);
     write_csr(sepc, tf->sepc);
 
+    /*for (int i = 0; i < 32; i++) {
+        uart_puts("reg["); uart_puthex(i); uart_puts("] = ");
+        uart_puthex(tf->regs[i]); uart_putc('\n');
+    }*/
+
     spin_lock(&uart_lock);
     uart_puts(">> About to sret to PC = ");
     uart_puthex(tf->sepc);
-    uart_putc('\n');
-    uart_puts(">> sp = ");
+    uart_puts("\n>> sp = ");
     uart_puthex(tf->regs[2]);
     uart_putc('\n');
     spin_unlock(&uart_lock);
@@ -261,7 +288,9 @@ restore_and_sret(trap_frame_t *tf)
         "ld a2, 8*12(%0)\n"
         "ld a3, 8*13(%0)\n"
         "ld a4, 8*14(%0)\n"
-        "ld a5, 8*15(%0)\n"
+
+        //"ld a5, 8*15(%0)\n"
+
         "ld a6, 8*16(%0)\n"
         "ld a7, 8*17(%0)\n"
         "ld s2, 8*18(%0)\n"

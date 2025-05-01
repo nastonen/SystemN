@@ -10,29 +10,18 @@
 #include "sched.h"
 #include "shell.h"
 
-//char shell_stack[4096]; // 4 KiB user stack
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
 
 #define USER_CODE_START 0x80020000
 #define USER_STACK_SIZE 4096
-
-//char user_stack[USER_STACK_SIZE];
-#define user_stack (USER_CODE_START + 0x1000)
+#define USER_STACK_TOP (USER_CODE_START + 2 * USER_STACK_SIZE)
 
 void
 proc_trampoline()
 {
-    spin_lock(&uart_lock);
-    uart_puts(">> Entered proc_trampoline()\n");
-    spin_unlock(&uart_lock);
-
     struct proc *p = curr_cpu()->proc;
-    restore_and_sret(&p->tf);  // This will drop into user mode at tf.sepc
-
-    spin_lock(&uart_lock);
-    uart_puts(">> Return from proc_trampoline()\n");
-    spin_unlock(&uart_lock);
+    restore_and_sret(p->tf);  // This will drop into user mode at tf->sepc
 }
 
 
@@ -44,7 +33,6 @@ shell_init()
     p->pid = 1;
     p->bound_cpu = 0; // remember to set to -1 by default
     p->state = RUNNABLE;
-    //p->is_idle = 0;
 
     // Copy user code to USER_CODE_START
     uint user_code_size = _binary_shell_bin_end - _binary_shell_bin_start;
@@ -53,23 +41,22 @@ shell_init()
     spin_lock(&uart_lock);
     uart_puts("Shell code copied to ");
     uart_puthex(USER_CODE_START);
-    uart_puts("\nFirst 4 bytes: ");
-    uint *p1 = (uint *)USER_CODE_START;
-    uart_puthex(p1[0]);
-    uart_puts("\n");
+    uart_putc('\n');
     spin_unlock(&uart_lock);
 
     // Set up trap frame
-    memset(&p->tf, 0, sizeof(p->tf));
-    p->tf.sepc = USER_CODE_START; //(ulong)user_shell_main;
-    p->tf.sstatus = SSTATUS_SPIE; // | SSTATUS_UPIE; // SPP=0 -> user mode
-    //p->tf.regs[2] = (ulong)(shell_stack + sizeof(shell_stack));
-    p->tf.regs[2] = (ulong)user_stack; // (user_stack + USER_STACK_SIZE);  // User stack pointer
+    p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
+    memset(p->tf, 0, sizeof(trap_frame_t));
+    p->tf->sepc = USER_CODE_START;
+    p->tf->sstatus = SSTATUS_SPIE; // | SSTATUS_UPIE; // SPP=0 -> user mode
+
+    p->tf->regs[2] = (ulong)USER_STACK_TOP;
+    p->tf->regs[4] = read_tp();
 
     // Set context
+    memset(&p->ctx, 0, sizeof(p->ctx));
     p->ctx.ra = (ulong)proc_trampoline;
-    //p->ctx.sp = (ulong)(shell_stack + sizeof(shell_stack));
-    p->ctx.sp = (user_stack + USER_STACK_SIZE); // optional
+    p->ctx.sp = (ulong)p->tf;
 }
 
 void
@@ -79,25 +66,21 @@ setup_idle_proc()
     struct proc *idle = &idle_procs[c->id];
 
     idle->pid = 0;
-    idle->state = RUNNING;
     idle->is_idle = 1;
-
-    // Create a dummy trap frame to keep things clean
-    memset(&idle->tf, 0, sizeof(idle->tf));
-    idle->tf.sepc = (ulong)idle_loop;
-    idle->tf.sstatus = SSTATUS_SPIE | SSTATUS_SPP;
+    idle->state = RUNNING;
 
     // Set context
     idle->ctx.ra = (ulong)idle_loop;
-    idle->ctx.sp = (ulong)&idle_stack[c->id][1024];
+    idle->ctx.sp = (ulong)idle->tf;
 
     c->proc = idle;
 }
 
+/*
 void jump_to_user_shell()
 {
     ulong user_pc = USER_CODE_START; //0x80020000;      // shell binary entry
-    ulong user_sp = user_stack; //0x80021000;      // user stack top
+    ulong user_sp = USER_STACK_TOP; //user_stack + USER_STACK_SIZE;
 
     // Setup SSTATUS: SPIE=1 (enable interrupts), SPP=0 (user mode)
     ulong sstatus = SSTATUS_SPIE;
@@ -115,6 +98,7 @@ void jump_to_user_shell()
         : "memory"
     );
 }
+*/
 
 void
 s_mode_main()
@@ -132,32 +116,17 @@ s_mode_main()
     // Test trap call
     if (curr_cpu()->id == 0) {
         shell_init();
-
-        // Manually?
-        //struct proc *p = &proc_table[0];
-        //restore_and_sret(&p->tf);
     }
 
-    jump_to_user_shell();
+    //jump_to_user_shell();
 
-    /*
-    spin_lock(&uart_lock);
-    uart_puts("tf->sstatus: ");
-    uart_puthex(curr_cpu()->proc->tf.sstatus);
-    uart_puts("\n");
-    spin_unlock(&uart_lock);
     schedule();
-    */
-    // called in trampoline!
-    //restore_and_sret(&curr_cpu()->proc->tf);
 
-    while (1) {
-        spin_lock(&uart_lock);
-        uart_puts("End of s_mode_main()\n");
-        spin_unlock(&uart_lock);
-
+    spin_lock(&uart_lock);
+    uart_puts("End of s_mode_main()\n");
+    spin_unlock(&uart_lock);
+    while (1)
         asm volatile("wfi");
-    }
 }
 
 void

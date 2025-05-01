@@ -33,7 +33,7 @@ user_shell_main()
         // Read input (blocking)
         int n = read(buf, sizeof(buf) - 1);
         if (n <= 0)
-            break;//continue;
+            continue;
 
         buf[n] = '\0'; // null-terminate
 

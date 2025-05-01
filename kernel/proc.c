@@ -3,7 +3,6 @@
 struct cpu cpus[NCPU];
 struct proc idle_procs[NCPU];
 struct proc proc_table[NPROC];
-char idle_stack[NCPU][1024];
 
 void
 idle_loop()

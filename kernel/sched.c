@@ -10,10 +10,6 @@ void swtch(context_t *old, context_t *new);
 void
 schedule()
 {
-    spin_lock(&uart_lock);
-    uart_puts("schedule() begin\n");
-    spin_unlock(&uart_lock);
-
     struct cpu *c = curr_cpu();
     struct proc *old = c->proc;
     struct proc *new = (void *)0;
@@ -48,13 +44,21 @@ schedule()
         new->state = RUNNING;
         c->proc = new;
 
-        spin_lock(&uart_lock);
-        uart_puts("new proc ");
-        uart_putc('0' + new->pid);
-        uart_puts(" found, switching to user code at ");
-        uart_puthex(new->tf.sepc);
-        uart_putc('\n');
-        spin_unlock(&uart_lock);
+        if (new->is_idle) {
+            spin_lock(&uart_lock);
+            uart_puts("CPU ");
+            uart_putc('0' + c->id);
+            uart_puts(" switching to idle\n");
+            spin_unlock(&uart_lock);
+        } else {
+            spin_lock(&uart_lock);
+            uart_puts("new proc ");
+            uart_putc('0' + new->pid);
+            uart_puts(" found, switching to user code at ");
+            uart_puthex(new->tf->sepc);
+            uart_putc('\n');
+            spin_unlock(&uart_lock);
+        }
 
         swtch(&old->ctx, &new->ctx);
     } else {
