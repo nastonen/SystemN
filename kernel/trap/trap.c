@@ -252,9 +252,11 @@ s_trap_handler(trap_frame_t *tf)
 void
 restore_and_sret(trap_frame_t *tf)
 {
+    /*
     spin_lock(&uart_lock);
     uart_puts(">> restore_and_sret()\n");
     spin_unlock(&uart_lock);
+    */
 
     write_csr(sstatus, tf->sstatus);
     write_csr(sepc, tf->sepc);
@@ -264,6 +266,7 @@ restore_and_sret(trap_frame_t *tf)
         uart_puthex(tf->regs[i]); uart_putc('\n');
     }*/
 
+    /*
     spin_lock(&uart_lock);
     uart_puts(">> About to sret to PC = ");
     uart_puthex(tf->sepc);
@@ -271,6 +274,7 @@ restore_and_sret(trap_frame_t *tf)
     uart_puthex(tf->regs[2]);
     uart_putc('\n');
     spin_unlock(&uart_lock);
+    */
 
     asm volatile(
         // Restore registers from tf->regs[]

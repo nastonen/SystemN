@@ -28,8 +28,8 @@ proc_trampoline()
 void
 shell_init()
 {
-    struct proc *p = &proc_table[0];
-    memset(p, 0, sizeof(*p));
+    proc_t *p = &proc_table[0];
+    memset(p, 0, sizeof(proc_t));
     p->pid = 1;
     p->bound_cpu = 0; // remember to set to -1 by default
     p->state = RUNNABLE;
@@ -38,11 +38,13 @@ shell_init()
     uint user_code_size = _binary_shell_bin_end - _binary_shell_bin_start;
     memcpy((void *)USER_CODE_START, _binary_shell_bin_start, user_code_size);
 
+    /*
     spin_lock(&uart_lock);
     uart_puts("Shell code copied to ");
     uart_puthex(USER_CODE_START);
     uart_putc('\n');
     spin_unlock(&uart_lock);
+    */
 
     // Set up trap frame
     p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
@@ -54,7 +56,7 @@ shell_init()
     p->tf->regs[4] = read_tp();
 
     // Set context
-    memset(&p->ctx, 0, sizeof(p->ctx));
+    memset(&p->ctx, 0, sizeof(context_t));
     p->ctx.ra = (ulong)proc_trampoline;
     p->ctx.sp = (ulong)p->tf;
 }
@@ -63,17 +65,44 @@ void
 setup_idle_proc()
 {
     struct cpu *c = curr_cpu();
-    struct proc *idle = &idle_procs[c->id];
+    proc_t *idle = &idle_procs[c->id];
 
+    memset(idle, 0, sizeof(proc_t));
     idle->pid = 0;
     idle->is_idle = 1;
     idle->state = RUNNING;
 
     // Set context
     idle->ctx.ra = (ulong)idle_loop;
-    idle->ctx.sp = (ulong)idle->tf;
+    idle->ctx.sp = (ulong)(idle_stack[c->id] + KSTACK_SIZE);
+}
 
-    c->proc = idle;
+void
+dummy_boot_return()
+{
+    while (1) {
+        spin_lock(&uart_lock);
+        uart_puts("Unexpected return to boot proc\n");
+        spin_unlock(&uart_lock);
+
+        asm volatile("wfi");
+    }
+}
+
+void
+setup_boot_proc()
+{
+    struct cpu *c = curr_cpu();
+    proc_t *boot = &boot_procs[c->id];
+
+    memset(boot, 0, sizeof(proc_t));
+    boot->pid = -1;
+    boot->state = RUNNING;
+
+    boot->ctx.ra = (ulong)dummy_boot_return;
+    boot->ctx.sp = (ulong)(boot_stack[c->id] + KSTACK_SIZE);
+
+    c->proc = boot;
 }
 
 /*
@@ -146,6 +175,9 @@ start()
             asm volatile("wfi");
         }
     }
+
+    // Set up boot process per CPU
+    setup_boot_proc();
 
     // Delegate exceptions and interrupts to S-mode
     write_csr(medeleg, 0xffff);

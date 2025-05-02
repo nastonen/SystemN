@@ -21,7 +21,6 @@ schedule()
             // Called yield(), does not want to run
             if (p == old)
                 continue;
-
             // Not my process
             if (p->bound_cpu != -1 && p->bound_cpu != (int)c->id)
                 continue;
@@ -59,6 +58,17 @@ schedule()
             uart_putc('\n');
             spin_unlock(&uart_lock);
         }
+
+        /*
+        spin_lock(&uart_lock);
+        uart_puts("old->ctx.ra = "); uart_puthex(old->ctx.ra);
+        uart_puts("\nold->ctx.sp = "); uart_puthex(old->ctx.sp);
+        uart_putc('\n');
+        uart_puts("\nnew->ctx.ra = "); uart_puthex(new->ctx.ra);
+        uart_puts("\nnew->ctx.sp = "); uart_puthex(new->ctx.sp);
+        uart_putc('\n');
+        spin_unlock(&uart_lock);
+        */
 
         swtch(&old->ctx, &new->ctx);
     } else {

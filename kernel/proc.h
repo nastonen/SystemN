@@ -1,7 +1,6 @@
 #pragma once
 
 #include "riscv.h"
-#include "trap/trap.h"
 
 #define NCPU        4  // number of CPUs
 #define NPROC       64  // max number of processes
@@ -14,6 +13,14 @@ curr_cpu()
 {
     return (struct cpu*)read_tp();
 }
+
+typedef struct trap_frame {
+    ulong regs[32];     // x0 - x31
+    ulong sepc;         // saved program counter
+    ulong sstatus;      // status register
+    ulong scause;       // cause of trap
+    ulong stval;        // trap value (like faulting addr)
+} trap_frame_t;
 
 typedef struct context_t {
     ulong ra;
@@ -29,7 +36,7 @@ enum proc_state {
     ZOMBIE
 };
 
-struct proc {
+typedef struct proc {
     int pid;
     enum proc_state state;
     int is_idle;
@@ -37,7 +44,7 @@ struct proc {
     char kstack[KSTACK_SIZE];
     trap_frame_t *tf;
     context_t ctx;
-};
+} proc_t;
 
 
 struct cpu {
@@ -49,4 +56,9 @@ struct cpu {
 
 extern struct cpu cpus[NCPU];
 extern struct proc proc_table[NPROC];
-extern struct proc idle_procs[NCPU];  // One idle process per CPU
+
+extern struct proc boot_procs[NCPU];
+extern char boot_stack[NCPU][KSTACK_SIZE];
+
+extern struct proc idle_procs[NCPU];
+extern char idle_stack[NCPU][KSTACK_SIZE];
