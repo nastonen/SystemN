@@ -1,7 +1,5 @@
 #include "uart.h"
 
-#define UART0 0x10000000L
-
 spinlock_t uart_lock = SPINLOCK_INIT;
 
 void
@@ -27,10 +25,25 @@ uart_puthex(ulong x)
     }
 }
 
-#define UART0 0x10000000L
-#define UART_RHR 0   // Receive Holding Register (read only)
-#define UART_LSR 5   // Line Status Register
-#define UART_LSR_RX_READY (1 << 0)  // Bit 0: Receiver data ready
+void
+uart_putlong(ulong val)
+{
+    char buf[21]; // Max for 64-bit decimal is 20 digits + null
+    int i = 20;
+    buf[i--] = '\0';
+
+    if (val == 0) {
+        uart_putc('0');
+        return;
+    }
+
+    while (val > 0 && i >= 0) {
+        buf[i--] = '0' + (val % 10);
+        val /= 10;
+    }
+
+    uart_puts(&buf[i + 1]);
+}
 
 char uart_getc(void)
 {
@@ -53,23 +66,6 @@ char uart_getc(void)
 
     return uart[UART_RHR];
 }
-
-/*
-char
-uart_getc(void)
-{
-    volatile char *uart = (volatile char *)UART0;
-    char c;
-
-    // Busy wait until UART has received something
-    // Might need a status register to check for input ready
-    do {
-        c = *uart;
-    } while (c == 0); // Or maybe 0xff depending on UART
-
-    return c;
-}
-*/
 
 int
 uart_gets(char *buf, int maxlen)
