@@ -40,7 +40,7 @@ syscall_handler(struct proc *p)
         break;
     case SYS_read:
         spin_lock(&uart_lock);
-        uart_puts("SYS_read()\n");
+        uart_puts("SYS_read\n");
         spin_unlock(&uart_lock);
 
         fd = tf->regs[10];                      // a0
@@ -58,18 +58,44 @@ syscall_handler(struct proc *p)
         break;
     case SYS_exit:
         spin_lock(&uart_lock);
-        uart_puts("Exiting program...\n");
+        uart_puts("SYS_exit\n");
         spin_unlock(&uart_lock);
         break;
     case SYS_getpid:
+        spin_lock(&uart_lock);
+        uart_puts("SYS_getpid\n");
+        spin_unlock(&uart_lock);
         tf->regs[10] = p->pid; //curr_cpu()->id; // Return hart_id as PID for now
         break;
     case SYS_yield:
         spin_lock(&uart_lock);
-        uart_puts("yield()...\n");
+        uart_puts("SYS_yield\n");
         spin_unlock(&uart_lock);
         p->state = RUNNABLE;
         schedule(); // yield and pick someone else
+        break;
+    case SYS_sleep_ms:
+        spin_lock(&uart_lock);
+        uart_puts("SYS_sleep_ms\n");
+        spin_unlock(&uart_lock);
+
+        ulong ms = tf->regs[10]; // a0
+        if (ms == 0 || ms > MAX_SLEEP_MS) {
+            tf->regs[10] = -1; // Return error
+            break;
+        }
+        spin_lock(&uart_lock);
+        uart_puts("Proc id ");
+        uart_putc('0' + p->pid);
+        uart_puts(" going to sleep for ");
+        uart_putlong(ms / 1000);
+        uart_puts(" seconds\n");
+        spin_unlock(&uart_lock);
+
+        p->sleep_until = read_time() + MS_TO_TIME(ms);
+        p->state = SLEEPING;
+        tf->regs[10] = 0;
+        schedule(); // yield
         break;
     default:
         spin_lock(&uart_lock);

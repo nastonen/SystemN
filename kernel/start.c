@@ -10,12 +10,12 @@
 #include "sched.h"
 #include "shell.h"
 
-extern char _binary_shell_bin_start[];
-extern char _binary_shell_bin_end[];
-
 #define USER_CODE_START 0x80020000
 #define USER_STACK_SIZE 4096
 #define USER_STACK_TOP (USER_CODE_START + 2 * USER_STACK_SIZE)
+
+extern char _binary_shell_bin_start[];
+extern char _binary_shell_bin_end[];
 
 void
 proc_trampoline()
@@ -170,11 +170,9 @@ start()
     c->id = hart_id;
 
     // Halt all harts except 0
-    if (hart_id != 0) {
-        while (1) {
+    if (hart_id != 0)
+        while (1)
             asm volatile("wfi");
-        }
-    }
 
     // Set up boot process per CPU
     setup_boot_proc();

@@ -42,6 +42,7 @@ typedef struct proc {
     int is_idle;
     int bound_cpu;
     char kstack[KSTACK_SIZE];
+    ulong sleep_until;
     trap_frame_t *tf;
     context_t ctx;
 } proc_t;

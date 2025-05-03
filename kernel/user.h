@@ -33,3 +33,12 @@ read(void *buf, unsigned long cnt)
 {
     return syscall3(SYS_read, 0, (long)buf, cnt);
 }
+
+static inline long
+sleep(unsigned long ms)
+{
+    if (ms == 0 || ms > (60 * 1000))
+        return 0;
+
+    return syscall1(SYS_sleep_ms, ms);
+}

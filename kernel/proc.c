@@ -19,6 +19,9 @@ idle_loop()
     uart_puts(": idle loop\n");
     spin_unlock(&uart_lock);
 
+    // Enable interrupts
+    set_csr(sstatus, SSTATUS_SIE);
+
     while (1)
         asm volatile("wfi");  // Wait for interrupt
 }

@@ -17,22 +17,23 @@ user_shell_main()
     }
     */
 
-    //while (1) {
+    while (1) {
         // Print prompt
         const char prompt[] = "$ ";
         write(prompt, 2);
 
         // Read input (blocking)
         int n = read(buf, sizeof(buf) - 1);
-        //if (n <= 0)
-          //  continue;
+        if (n <= 0)
+            continue;
 
         buf[n] = '\0'; // null-terminate
 
+        sleep(5000);
+
         // Echo back
         write(buf, n);
-    //}
 
-    //while (1)
-        syscall0(SYS_yield);
+        yield();
+    }
 }
