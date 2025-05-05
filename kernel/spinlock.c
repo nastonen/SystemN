@@ -6,7 +6,6 @@ void
 spin_lock(spinlock_t *lock)
 {
     struct cpu *c = curr_cpu();
-
     if (c->lock_depth == 0) {
         // Save current interrupt state and disable interrupts
         c->sstatus = read_csr(sstatus);
@@ -17,6 +16,23 @@ spin_lock(spinlock_t *lock)
 
     while (__atomic_test_and_set(&lock->locked, __ATOMIC_ACQUIRE))
         asm volatile("nop");
+}
+
+int
+spin_trylock(spinlock_t *lock)
+{
+    struct cpu *c = curr_cpu();
+    if (c->lock_depth == 0) {
+        // Save current interrupt state and disable interrupts
+        c->sstatus = read_csr(sstatus);
+        write_csr(sstatus, c->sstatus & ~(1UL << 1));  // Clear SIE
+
+    }
+    c->lock_depth++;
+
+    int expected = 0;
+    return __atomic_compare_exchange_n(&lock->locked, &expected, 1,
+                                       0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
 }
 
 void

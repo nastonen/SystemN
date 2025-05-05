@@ -65,14 +65,15 @@ syscall_handler(struct proc *p)
         spin_lock(&uart_lock);
         uart_puts("SYS_getpid\n");
         spin_unlock(&uart_lock);
-        tf->regs[10] = p->pid; //curr_cpu()->id; // Return hart_id as PID for now
+        tf->regs[10] = p->pid;
         break;
     case SYS_yield:
         spin_lock(&uart_lock);
         uart_puts("SYS_yield\n");
         spin_unlock(&uart_lock);
         p->state = RUNNABLE;
-        schedule(); // yield and pick someone else
+        //schedule(); // yield and pick someone else
+        curr_cpu()->needs_sched = 1;
         break;
     case SYS_sleep_ms:
         spin_lock(&uart_lock);
@@ -95,7 +96,8 @@ syscall_handler(struct proc *p)
         p->sleep_until = read_time() + MS_TO_TIME(ms);
         p->state = SLEEPING;
         tf->regs[10] = 0;
-        schedule(); // yield
+        //schedule(); // yield
+        curr_cpu()->needs_sched = 1;
         break;
     default:
         spin_lock(&uart_lock);
@@ -122,7 +124,8 @@ s_trap_handler(trap_frame_t *tf)
         // Timer interrupt on idle core
         if ((cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
             timer_handle();
-            return;
+            goto end;
+            //return;
         } else {
             spin_lock(&uart_lock);
             uart_puts("Trap on idle core? Should not happen, Halting...\n");
@@ -227,6 +230,10 @@ s_trap_handler(trap_frame_t *tf)
     case SCAUSE_TIMER_INTERRUPT:
         // Timer interrupt
         if (cause & SCAUSE_IRQ_BIT) {
+            spin_lock(&uart_lock);
+            uart_putc('0' + c->id);
+            uart_puts("Normal timer interrupt\n");
+            spin_unlock(&uart_lock);
             timer_handle();
             /*
             spin_lock(&uart_lock);
@@ -273,6 +280,18 @@ s_trap_handler(trap_frame_t *tf)
     uart_putc('\n');
     spin_unlock(&uart_lock);
     */
+
+end:
+    if (curr_cpu()->needs_sched) {
+        spin_lock(&uart_lock);
+        uart_puts("CPU ");
+        uart_putc('0' + curr_cpu()->id);
+        uart_puts(" needs sched\n");
+        spin_unlock(&uart_lock);
+
+        curr_cpu()->needs_sched = 0;
+        schedule();
+    }
 }
 
 void

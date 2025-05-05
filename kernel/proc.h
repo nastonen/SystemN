@@ -52,6 +52,7 @@ struct cpu {
     uint id;            // hard ID
     uint lock_depth;    // depth of nested spinlocks
     ulong sstatus;      // interrupt state before first lock
+    int needs_sched;
     struct proc *proc;  // current process
 };
 

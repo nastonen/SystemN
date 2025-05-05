@@ -14,7 +14,7 @@ s_trap_vector:
     addi sp, sp, -288
 
     # Save x0–x31 into regs[0..31] (x0 is hardwired, save 0 for consistency)
-    sd x0,    0(sp)     # x0 (hardwired zero)
+    #sd x0,    0(sp)     # x0 (hardwired zero)
     sd x1,    8(sp)     # ra
     sd x2,   16(sp)     # sp
     sd x3,   24(sp)     # gp

@@ -33,20 +33,27 @@ timer_handle()
     //spin_unlock(&uart_lock);
 
     int sched = 0;
-    for (int i = 0; i < NPROC; i++) {
-        proc_t *p = &proc_table[i];
-        if (p && p->state == SLEEPING && read_time() >= p->sleep_until) {
-            spin_lock(&uart_lock);
-            uart_puts("Proc id ");
-            uart_putc('0' + p->pid);
-            uart_puts(" became runnable\n");
-            spin_unlock(&uart_lock);
 
-            p->state = RUNNABLE;
-            sched = 1;
+    if (spin_trylock(&sched_lock)) {
+        for (int i = 0; i < NPROC; i++) {
+            proc_t *p = &proc_table[i];
+            if (p && p->state == SLEEPING && read_time() >= p->sleep_until) {
+                spin_lock(&uart_lock);
+                uart_puts("CPU ");
+                uart_putc('0' + curr_cpu()->id);
+                uart_puts(": proc id ");
+                uart_putc('0' + p->pid);
+                uart_puts(" became runnable\n");
+                spin_unlock(&uart_lock);
+
+                p->state = RUNNABLE;
+                sched = 1;
+            }
         }
+        spin_unlock(&sched_lock);
     }
 
     if (sched)
-        schedule();
+        //schedule();
+        curr_cpu()->needs_sched = 1;
 }

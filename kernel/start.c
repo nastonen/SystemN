@@ -170,9 +170,9 @@ start()
     c->id = hart_id;
 
     // Halt all harts except 0
-    if (hart_id != 0)
-        while (1)
-            asm volatile("wfi");
+    //if (hart_id != 0)
+      //  while (1)
+        //    asm volatile("wfi");
 
     // Set up boot process per CPU
     setup_boot_proc();

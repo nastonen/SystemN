@@ -29,7 +29,7 @@ user_shell_main()
 
         buf[n] = '\0'; // null-terminate
 
-        sleep(5000);
+        sleep(1000);
 
         // Echo back
         write(buf, n);

@@ -10,6 +10,10 @@ void swtch(context_t *old, context_t *new);
 void
 schedule()
 {
+    spin_lock(&uart_lock);
+    uart_puts("schedule() run...\n");
+    spin_unlock(&uart_lock);
+
     struct cpu *c = curr_cpu();
     struct proc *old = c->proc;
     struct proc *new = (void *)0;
@@ -73,7 +77,9 @@ schedule()
         swtch(&old->ctx, &new->ctx);
     } else {
         spin_lock(&uart_lock);
-        uart_puts("Staying idle...\n");
+        uart_puts("CPU ");
+        uart_putc('0' + c->id);
+        uart_puts(" staying idle...\n");
         spin_unlock(&uart_lock);
         // Stay in idle
         while (1)
