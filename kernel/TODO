@@ -1,5 +1,5 @@
 - 'write' syscall to print whole string at a time
 - max number of processes?
-- sleep syscall
+- per cpu process q
 - schedule on timer interrupts
 - kalloc
