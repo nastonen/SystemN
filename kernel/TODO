@@ -1,3 +1,4 @@
 - 'write' syscall to print whole string at a time
 - schedule on timer interrupts
 - memory separation
+- console driver + buffered printk
