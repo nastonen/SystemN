@@ -1,7 +1,7 @@
 ENTRY(user_shell_main)
 
 SECTIONS {
-  . = 0x80020000;
+  . = 0x84000000;
 
   .text : {
     PROVIDE(user_shell_main = .);

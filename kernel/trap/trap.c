@@ -9,8 +9,9 @@
 #include "../sched.h"
 
 void
-syscall_handler(struct proc *p)
+syscall_handler(proc_t *p)
 {
+    cpu_t *c = curr_cpu();
     trap_frame_t *tf = p->tf;
     int syscall_num = tf->regs[17]; // a7 (syscall number)
 
@@ -71,9 +72,16 @@ syscall_handler(struct proc *p)
         spin_lock(&uart_lock);
         uart_puts("SYS_yield\n");
         spin_unlock(&uart_lock);
-        p->state = RUNNABLE;
-        //schedule(); // yield and pick someone else
-        curr_cpu()->needs_sched = 1;
+
+        // Enqueue back to runnable q
+        //spin_lock(&sched_lock);
+        if (!p->is_idle && p->state == RUNNING) {
+            p->state = RUNNABLE;
+            list_add_tail(&p->q_node, &c->run_queue);
+        }
+        //spin_unlock(&sched_lock);
+
+        c->needs_sched = 1;
         break;
     case SYS_sleep_ms:
         spin_lock(&uart_lock);
@@ -85,6 +93,7 @@ syscall_handler(struct proc *p)
             tf->regs[10] = -1; // Return error
             break;
         }
+        /*
         spin_lock(&uart_lock);
         uart_puts("Proc id ");
         uart_putc('0' + p->pid);
@@ -92,12 +101,14 @@ syscall_handler(struct proc *p)
         uart_putlong(ms / 1000);
         uart_puts(" seconds\n");
         spin_unlock(&uart_lock);
+        */
 
-        p->sleep_until = read_time() + MS_TO_TIME(ms);
         p->state = SLEEPING;
+        list_add_tail(&p->q_node, &c->sleep_queue);
+        p->sleep_until = read_time() + MS_TO_TIME(ms);
         tf->regs[10] = 0;
-        //schedule(); // yield
-        curr_cpu()->needs_sched = 1;
+
+        c->needs_sched = 1;
         break;
     default:
         spin_lock(&uart_lock);
@@ -283,12 +294,6 @@ s_trap_handler(trap_frame_t *tf)
 
 end:
     if (curr_cpu()->needs_sched) {
-        spin_lock(&uart_lock);
-        uart_puts("CPU ");
-        uart_putc('0' + curr_cpu()->id);
-        uart_puts(" needs sched\n");
-        spin_unlock(&uart_lock);
-
         curr_cpu()->needs_sched = 0;
         schedule();
     }

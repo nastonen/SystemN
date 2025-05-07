@@ -15,4 +15,7 @@ SECTIONS
     .bss : {
         *(.bss)  /* All uninitialized data goes here */
     }
+
+    /* Define symbol _kernel_end at current location */
+    _kernel_end = .;
 }

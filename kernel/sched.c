@@ -1,6 +1,7 @@
 #include "sched.h"
 #include "proc.h"
 #include "uart.h"
+#include "list.h"
 
 spinlock_t sched_lock = SPINLOCK_INIT;
 
@@ -14,26 +15,29 @@ schedule()
     uart_puts("schedule() run...\n");
     spin_unlock(&uart_lock);
 
-    struct cpu *c = curr_cpu();
-    struct proc *old = c->proc;
-    struct proc *new = (void *)0;
+    cpu_t *c = curr_cpu();
+    proc_t *old = c->proc;
+    proc_t *new = NULL;
 
-    spin_lock(&sched_lock);
-    for (int i = 0; i < NPROC; i++) {
-        struct proc *p = &proc_table[i];
-        if (p->state == RUNNABLE) {
-            // Called yield(), does not want to run
-            if (p == old)
-                continue;
-            // Not my process
-            if (p->bound_cpu != -1 && p->bound_cpu != (int)c->id)
-                continue;
+    list_node_t *head = &c->run_queue;
+    list_node_t *next_node = old->q_node.next;
 
-            new = p;
-            break;
-        }
+    // Check if old is in the run queue
+    if (old->state == RUNNABLE && list_in_queue(&old->q_node)) {
+        next_node = old->q_node.next;
+        if (next_node == head)
+            next_node = next_node->next;
+    } else {
+        // Fallback: pick first in queue
+        next_node = head->next;
     }
-    spin_unlock(&sched_lock);
+
+    if (next_node != head)
+        new = container_of(next_node, proc_t, q_node);
+
+    if (new == old)
+        new = NULL;
+
 
     // No runnable process, run idle
     if (!new && !old->is_idle)
@@ -41,9 +45,14 @@ schedule()
 
     if (new && new != old) {
         // Mark old proc as not running
-        if (!old->is_idle && old->state == RUNNING)
+        if (old->pid > 0 && old->state == RUNNING) {
             old->state = RUNNABLE;
+            list_add_tail(&old->q_node, &c->run_queue);
+        }
 
+        // Remove new from run_queue and set RUNNING
+        if (list_in_queue(&new->q_node))
+            list_del(&new->q_node);
         new->state = RUNNING;
         c->proc = new;
 

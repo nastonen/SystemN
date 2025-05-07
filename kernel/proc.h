@@ -1,18 +1,11 @@
 #pragma once
 
 #include "riscv.h"
+#include "list.h"
 
 #define NCPU        4  // number of CPUs
 #define NPROC       64  // max number of processes
 #define KSTACK_SIZE 4096
-
-void idle_loop();
-
-static inline struct cpu *
-curr_cpu()
-{
-    return (struct cpu*)read_tp();
-}
 
 typedef struct trap_frame {
     ulong regs[32];     // x0 - x31
@@ -22,7 +15,7 @@ typedef struct trap_frame {
     ulong stval;        // trap value (like faulting addr)
 } trap_frame_t;
 
-typedef struct context_t {
+typedef struct context {
     ulong ra;
     ulong sp;
     ulong s[12];
@@ -45,22 +38,33 @@ typedef struct proc {
     ulong sleep_until;
     trap_frame_t *tf;
     context_t ctx;
+    list_node_t q_node;
 } proc_t;
 
-
-struct cpu {
+typedef struct cpu {
     uint id;            // hard ID
     uint lock_depth;    // depth of nested spinlocks
     ulong sstatus;      // interrupt state before first lock
     int needs_sched;
-    struct proc *proc;  // current process
-};
+    proc_t *proc;       // current process
+    list_node_t run_queue;
+    list_node_t sleep_queue;
+} cpu_t;
 
-extern struct cpu cpus[NCPU];
-extern struct proc proc_table[NPROC];
+static inline cpu_t *
+curr_cpu()
+{
+    return (cpu_t *)read_tp();
+}
 
-extern struct proc boot_procs[NCPU];
+extern cpu_t cpus[NCPU];
+
+extern proc_t boot_procs[NCPU];
 extern char boot_stack[NCPU][KSTACK_SIZE];
 
-extern struct proc idle_procs[NCPU];
+extern proc_t idle_procs[NCPU];
 extern char idle_stack[NCPU][KSTACK_SIZE];
+
+void idle_loop();
+struct proc *create_proc();
+void free_proc(proc_t *p);

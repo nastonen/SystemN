@@ -9,7 +9,7 @@ OBJDUMP = $(CROSS)objdump
 
 # Files
 OBJS = entry.o start.o uart.o spinlock.o proc.o trap/trap.o \
-       trap/trap_vec.o string.o sched.o swtch.o shell.o
+       trap/trap_vec.o string.o sched.o swtch.o shell.o mem.o
 TARGET = kernel
 LINKER = kernel.ld
 

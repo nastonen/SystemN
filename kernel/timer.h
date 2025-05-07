@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sched.h"
+#include "list.h"
 
 #define TIME_FREQ      10000000UL                   // 10 MHz
 #define TIMER_INTERVAL (TIME_FREQ / 100)            // 100 Hz
@@ -32,26 +33,29 @@ timer_handle()
     //uart_puts("timer_handle()\n");
     //spin_unlock(&uart_lock);
 
+    struct cpu *c = curr_cpu();
     int sched = 0;
 
-    if (spin_trylock(&sched_lock)) {
-        for (int i = 0; i < NPROC; i++) {
-            proc_t *p = &proc_table[i];
-            if (p && p->state == SLEEPING && read_time() >= p->sleep_until) {
-                spin_lock(&uart_lock);
-                uart_puts("CPU ");
-                uart_putc('0' + curr_cpu()->id);
-                uart_puts(": proc id ");
-                uart_putc('0' + p->pid);
-                uart_puts(" became runnable\n");
-                spin_unlock(&uart_lock);
+    list_node_t *pos, *tmp;
+    list_for_each_safe(pos, tmp, &c->sleep_queue) {
+        proc_t *p = container_of(pos, proc_t, q_node);
+        if (read_time() >= p->sleep_until) {
+            list_del(&p->q_node);
+            p->state = RUNNABLE;
+            list_add_tail(&p->q_node, &c->run_queue);
 
-                p->state = RUNNABLE;
-                sched = 1;
-            }
+            sched = 1;
+
+            spin_lock(&uart_lock);
+            uart_puts("CPU ");
+            uart_putc('0' + curr_cpu()->id);
+            uart_puts(": proc id ");
+            uart_putc('0' + p->pid);
+            uart_puts(" became runnable\n");
+            spin_unlock(&uart_lock);
         }
-        spin_unlock(&sched_lock);
     }
+
 
     if (sched)
         //schedule();

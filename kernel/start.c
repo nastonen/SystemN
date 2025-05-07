@@ -8,55 +8,50 @@
 #include "syscall.h"
 #include "string.h"
 #include "sched.h"
+#include "mem.h"
 #include "shell.h"
 
-#define USER_CODE_START 0x80020000
 #define USER_STACK_SIZE 4096
-#define USER_STACK_TOP (USER_CODE_START + 2 * USER_STACK_SIZE)
+#define USER_STACK_TOP (USER_START + 2 * USER_STACK_SIZE)
 
+volatile int allocator_ready = 0;
+extern char _kernel_end[];
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
 
 void
 proc_trampoline()
 {
-    struct proc *p = curr_cpu()->proc;
+    proc_t *p = curr_cpu()->proc;
     restore_and_sret(p->tf);  // This will drop into user mode at tf->sepc
 }
-
 
 void
 shell_init()
 {
-    proc_t *p = &proc_table[0];
-    memset(p, 0, sizeof(proc_t));
-    p->pid = 1;
-    p->bound_cpu = 0; // remember to set to -1 by default
-    p->state = RUNNABLE;
+    proc_t *p = create_proc();
+    p->bound_cpu = 0;
 
-    // Copy user code to USER_CODE_START
+    // Copy user code to USER_START
     uint user_code_size = _binary_shell_bin_end - _binary_shell_bin_start;
-    memcpy((void *)USER_CODE_START, _binary_shell_bin_start, user_code_size);
+    memcpy((void *)USER_START, _binary_shell_bin_start, user_code_size);
 
     /*
     spin_lock(&uart_lock);
     uart_puts("Shell code copied to ");
-    uart_puthex(USER_CODE_START);
+    uart_puthex(USER_START);
     uart_putc('\n');
     spin_unlock(&uart_lock);
     */
 
     // Set up trap frame
-    p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
-    memset(p->tf, 0, sizeof(trap_frame_t));
-    p->tf->sepc = USER_CODE_START;
+    p->tf->sepc = USER_START;
     p->tf->sstatus = SSTATUS_SPIE; // | SSTATUS_UPIE; // SPP=0 -> user mode
 
     p->tf->regs[2] = (ulong)USER_STACK_TOP;
     p->tf->regs[4] = read_tp();
 
     // Set context
-    memset(&p->ctx, 0, sizeof(context_t));
     p->ctx.ra = (ulong)proc_trampoline;
     p->ctx.sp = (ulong)p->tf;
 }
@@ -64,7 +59,7 @@ shell_init()
 void
 setup_idle_proc()
 {
-    struct cpu *c = curr_cpu();
+    cpu_t *c = curr_cpu();
     proc_t *idle = &idle_procs[c->id];
 
     memset(idle, 0, sizeof(proc_t));
@@ -92,7 +87,7 @@ dummy_boot_return()
 void
 setup_boot_proc()
 {
-    struct cpu *c = curr_cpu();
+    cpu_t *c = curr_cpu();
     proc_t *boot = &boot_procs[c->id];
 
     memset(boot, 0, sizeof(proc_t));
@@ -108,7 +103,7 @@ setup_boot_proc()
 /*
 void jump_to_user_shell()
 {
-    ulong user_pc = USER_CODE_START; //0x80020000;      // shell binary entry
+    ulong user_pc = USER_START; //0x84000000;      // shell binary entry
     ulong user_sp = USER_STACK_TOP; //user_stack + USER_STACK_SIZE;
 
     // Setup SSTATUS: SPIE=1 (enable interrupts), SPP=0 (user mode)
@@ -166,8 +161,22 @@ start()
     write_tp((ulong)&cpus[hart_id]);
 
     // Set hart_id to struct cpu
-    struct cpu *c = curr_cpu();
+    cpu_t *c = curr_cpu();
     c->id = hart_id;
+
+    if (c->id == 0) {
+        // Initialize global kernel memory allocator
+        init_allocator(_kernel_end, (void *)KERNEL_END);
+        allocator_ready = 1;
+    } else {
+        // Wait for hart 0 to finish allocator init
+        while (!allocator_ready)
+            asm volatile("nop");
+    }
+
+    // Create per-CPU process queues
+    INIT_LIST_HEAD(&cpus[c->id].run_queue);
+    INIT_LIST_HEAD(&cpus[c->id].sleep_queue);
 
     // Halt all harts except 0
     //if (hart_id != 0)

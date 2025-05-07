@@ -1,13 +1,17 @@
 #include "proc.h"
 #include "uart.h"
+#include "mem.h"
+#include "list.h"
 
-struct cpu cpus[NCPU];
-struct proc proc_table[NPROC];
+static int next_pid = 1;
+static spinlock_t pid_lock = SPINLOCK_INIT;
 
-struct proc boot_procs[NCPU];
+cpu_t cpus[NCPU];
+
+proc_t boot_procs[NCPU];
 char boot_stack[NCPU][KSTACK_SIZE];
 
-struct proc idle_procs[NCPU];
+proc_t idle_procs[NCPU];
 char idle_stack[NCPU][KSTACK_SIZE];
 
 void
@@ -24,4 +28,43 @@ idle_loop()
 
     while (1)
         asm volatile("wfi");  // Wait for interrupt
+}
+
+struct proc *
+create_proc()
+{
+    proc_t *p = (proc_t *)kzalloc(sizeof(proc_t));
+    if (!p) {
+        spin_lock(&uart_lock);
+        uart_puts("Process creation failed. Return 0.\n");
+        spin_unlock(&uart_lock);
+
+        return 0;
+    }
+
+    spin_lock(&pid_lock);
+    p->pid = next_pid++;
+    spin_unlock(&pid_lock);
+
+    p->bound_cpu = -1;
+    p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
+
+    // Put into RUNNABLE queue
+    p->state = RUNNABLE;
+    list_add_tail(&p->q_node, &cpus[curr_cpu()->id].run_queue);
+
+    return p;
+}
+
+void
+free_proc(proc_t *p)
+{
+    if (!p)
+        return;
+
+    // If it's in a queue, remove it
+    if (p->q_node.prev || p->q_node.next)
+        list_del(&p->q_node);
+
+    kfree(p);
 }
