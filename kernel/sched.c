@@ -5,7 +5,7 @@
 
 spinlock_t sched_lock = SPINLOCK_INIT;
 
-// Forward declaration:
+// Forward declaration
 void swtch(context_t *old, context_t *new);
 
 void

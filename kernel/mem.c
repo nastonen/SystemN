@@ -2,7 +2,7 @@
 #include "types.h"
 #include "string.h"
 
-static page_t *free_list = 0;
+static page_t *free_list = NULL;
 
 void
 init_allocator(void *mem_start, void *mem_end)
@@ -21,7 +21,7 @@ void *
 alloc_page()
 {
     if (!free_list)
-        return 0;
+        return NULL;
 
     page_t *page = free_list;
     free_list = free_list->next;
@@ -41,13 +41,13 @@ void *
 kmalloc(uint size)
 {
     if (size == 0)
-        return 0;
+        return NULL;
 
     uint num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     // Allocate contiguous pages
-    void *first = 0;
-    void *prev = 0;
+    void *first = NULL;
+    void *prev = NULL;
 
     for (uint i = 0; i < num_pages; i++) {
         void *page = alloc_page();
@@ -58,7 +58,7 @@ kmalloc(uint size)
                 free_page(first);
                 first = next;
             }
-            return 0;
+            return NULL;
         }
 
         if (prev)
@@ -70,7 +70,7 @@ kmalloc(uint size)
     }
 
     // NULL-terminate the chain
-    *((void **)prev) = 0;
+    *((void **)prev) = NULL;
 
     return first;
 }

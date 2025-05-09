@@ -33,7 +33,7 @@ timer_handle()
     //uart_puts("timer_handle()\n");
     //spin_unlock(&uart_lock);
 
-    struct cpu *c = curr_cpu();
+    cpu_t *c = curr_cpu();
     int sched = 0;
 
     list_node_t *pos, *tmp;
@@ -58,6 +58,5 @@ timer_handle()
 
 
     if (sched)
-        //schedule();
         curr_cpu()->needs_sched = 1;
 }

@@ -65,5 +65,5 @@ extern proc_t idle_procs[NCPU];
 extern char idle_stack[NCPU][KSTACK_SIZE];
 
 void idle_loop();
-struct proc *create_proc();
+proc_t *create_proc();
 void free_proc(proc_t *p);

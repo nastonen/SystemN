@@ -30,16 +30,16 @@ idle_loop()
         asm volatile("wfi");  // Wait for interrupt
 }
 
-struct proc *
+proc_t *
 create_proc()
 {
     proc_t *p = (proc_t *)kzalloc(sizeof(proc_t));
     if (!p) {
         spin_lock(&uart_lock);
-        uart_puts("Process creation failed. Return 0.\n");
+        uart_puts("Process creation failed. Return NULL.\n");
         spin_unlock(&uart_lock);
 
-        return 0;
+        return NULL;
     }
 
     spin_lock(&pid_lock);

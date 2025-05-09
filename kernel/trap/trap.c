@@ -14,7 +14,6 @@ syscall_handler(proc_t *p)
     cpu_t *c = curr_cpu();
     trap_frame_t *tf = p->tf;
     int syscall_num = tf->regs[17]; // a7 (syscall number)
-
     int fd;
     ulong len;
 
@@ -124,8 +123,8 @@ syscall_handler(proc_t *p)
 void
 s_trap_handler(trap_frame_t *tf)
 {
-    struct cpu *c = curr_cpu();
-    struct proc *p = c->proc;
+    cpu_t *c = curr_cpu();
+    proc_t *p = c->proc;
 
     ulong cause = read_csr(scause);
     ulong code  = SCAUSE_CODE(cause);
@@ -191,7 +190,7 @@ s_trap_handler(trap_frame_t *tf)
     }
 
     // Capture original process
-    //struct proc *orig_proc = p;
+    //proc_t *orig_proc = p;
 
     /*
     spin_lock(&uart_lock);
@@ -246,12 +245,6 @@ s_trap_handler(trap_frame_t *tf)
             uart_puts("Normal timer interrupt\n");
             spin_unlock(&uart_lock);
             timer_handle();
-            /*
-            spin_lock(&uart_lock);
-            uart_putc('0' + c->id);
-            uart_puts(": [S] Timer interrupt received\n");
-            spin_unlock(&uart_lock);
-            */
         }
         break;
     case SCAUSE_SUPERVISOR_IRQ: // Supervisor Software Interrupt

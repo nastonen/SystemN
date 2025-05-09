@@ -5,7 +5,7 @@
 void
 spin_lock(spinlock_t *lock)
 {
-    struct cpu *c = curr_cpu();
+    cpu_t *c = curr_cpu();
     if (c->lock_depth == 0) {
         // Save current interrupt state and disable interrupts
         c->sstatus = read_csr(sstatus);
@@ -21,7 +21,7 @@ spin_lock(spinlock_t *lock)
 int
 spin_trylock(spinlock_t *lock)
 {
-    struct cpu *c = curr_cpu();
+    cpu_t *c = curr_cpu();
     if (c->lock_depth == 0) {
         // Save current interrupt state and disable interrupts
         c->sstatus = read_csr(sstatus);
@@ -38,7 +38,7 @@ spin_trylock(spinlock_t *lock)
 void
 spin_unlock(spinlock_t *lock)
 {
-    struct cpu *c = curr_cpu();
+    cpu_t *c = curr_cpu();
 
     // Sanity check: lock should not be unlocked if not locked
     if (c->lock_depth == 0) {
