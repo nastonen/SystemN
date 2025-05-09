@@ -63,7 +63,7 @@ free_proc(proc_t *p)
         return;
 
     // If it's in a queue, remove it
-    if (p->q_node.prev || p->q_node.next)
+    if (list_in_queue(&p->q_node))
         list_del(&p->q_node);
 
     kfree(p);

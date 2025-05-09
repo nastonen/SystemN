@@ -4,7 +4,6 @@
 #include "list.h"
 
 #define NCPU        4  // number of CPUs
-#define NPROC       64  // max number of processes
 #define KSTACK_SIZE 4096
 
 typedef struct trap_frame {
