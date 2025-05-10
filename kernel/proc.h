@@ -57,12 +57,8 @@ curr_cpu()
 }
 
 extern cpu_t cpus[NCPU];
-
 extern proc_t boot_procs[NCPU];
-extern char boot_stack[NCPU][KSTACK_SIZE];
-
 extern proc_t idle_procs[NCPU];
-extern char idle_stack[NCPU][KSTACK_SIZE];
 
 void idle_loop();
 proc_t *create_proc();

@@ -7,12 +7,8 @@ static int next_pid = 1;
 static spinlock_t pid_lock = SPINLOCK_INIT;
 
 cpu_t cpus[NCPU];
-
 proc_t boot_procs[NCPU];
-char boot_stack[NCPU][KSTACK_SIZE];
-
 proc_t idle_procs[NCPU];
-char idle_stack[NCPU][KSTACK_SIZE];
 
 void
 idle_loop()

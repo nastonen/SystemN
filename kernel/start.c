@@ -69,7 +69,7 @@ setup_idle_proc()
 
     // Set context
     idle->ctx.ra = (ulong)idle_loop;
-    idle->ctx.sp = (ulong)(idle_stack[c->id] + KSTACK_SIZE);
+    idle->ctx.sp = (ulong)(idle->kstack + KSTACK_SIZE);
 }
 
 void
@@ -95,7 +95,7 @@ setup_boot_proc()
     boot->state = RUNNING;
 
     boot->ctx.ra = (ulong)dummy_boot_return;
-    boot->ctx.sp = (ulong)(boot_stack[c->id] + KSTACK_SIZE);
+    boot->ctx.sp = (ulong)(boot->kstack + KSTACK_SIZE);
 
     c->proc = boot;
 }
