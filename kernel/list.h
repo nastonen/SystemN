@@ -56,7 +56,7 @@ list_del(list_node_t *entry)
 {
     entry->next->prev = entry->prev;
     entry->prev->next = entry->next;
-    entry->next = entry->prev = (void *)0;
+    entry->next = entry->prev = NULL;
 }
 
 static inline int
@@ -68,7 +68,7 @@ list_empty(const list_node_t *head)
 static inline int
 list_in_queue(list_node_t *node)
 {
-    return node->next != 0 && node->prev != 0;
+    return node->next && node->prev;
 }
 
 
@@ -82,9 +82,5 @@ list_in_queue(list_node_t *node)
          pos = tmp, tmp = pos->next)
 
 // Get the containing struct from node
-//#define list_entry(ptr, type, member)
-//    ((type *)((char *)(ptr) - (unsigned long)(&((type *)0)->member)))
-
-// Get the containing struct from node
 #define container_of(ptr, type, member) \
-    ((type *)((char *)(ptr) - (unsigned long)(&((type *)0)->member)))
+    ((type *)((char *)(ptr) - (unsigned long)(&((type *)NULL)->member)))

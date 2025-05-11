@@ -72,14 +72,6 @@ syscall_handler(proc_t *p)
         uart_puts("SYS_yield\n");
         spin_unlock(&uart_lock);
 
-        // Enqueue back to runnable q
-        //spin_lock(&sched_lock);
-        if (!p->is_idle && p->state == RUNNING) {
-            p->state = RUNNABLE;
-            list_add_tail(&p->q_node, &c->run_queue);
-        }
-        //spin_unlock(&sched_lock);
-
         c->needs_sched = 1;
         break;
     case SYS_sleep_ms:
@@ -240,10 +232,13 @@ s_trap_handler(trap_frame_t *tf)
     case SCAUSE_TIMER_INTERRUPT:
         // Timer interrupt
         if (cause & SCAUSE_IRQ_BIT) {
+            /*
             spin_lock(&uart_lock);
             uart_putc('0' + c->id);
             uart_puts("Normal timer interrupt\n");
             spin_unlock(&uart_lock);
+            */
+
             timer_handle();
         }
         break;
