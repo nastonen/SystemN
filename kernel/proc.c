@@ -11,11 +11,11 @@ proc_t idle_procs[NCPU];
 void
 idle_loop()
 {
-    spin_lock(&uart_lock);
-    uart_puts("Hart ");
-    uart_putc('0' + curr_cpu()->id);
-    uart_puts(": idle loop\n");
-    spin_unlock(&uart_lock);
+    DEBUG_PRINT(
+        uart_puts("Hart ");
+        uart_putc('0' + curr_cpu()->id);
+        uart_puts(": idle loop\n");
+    );
 
     // Enable interrupts
     set_csr(sstatus, SSTATUS_SIE);
@@ -29,9 +29,9 @@ create_proc()
 {
     proc_t *p = (proc_t *)kzalloc(sizeof(proc_t));
     if (!p) {
-        spin_lock(&uart_lock);
-        uart_puts("Process creation failed. Return NULL.\n");
-        spin_unlock(&uart_lock);
+        DEBUG_PRINT(
+            uart_puts("Process creation failed. Return NULL.\n");
+        );
 
         return NULL;
     }

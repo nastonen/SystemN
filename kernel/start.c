@@ -75,11 +75,11 @@ void
 s_mode_main()
 {
     // Just print hello for now
-    spin_lock(&uart_lock);
-    uart_puts("Hart ");
-    uart_putc('0' + curr_cpu()->id);
-    uart_puts(": Hello from S-mode!\n");
-    spin_unlock(&uart_lock);
+    DEBUG_PRINT(
+        uart_puts("Hart ");
+        uart_putc('0' + curr_cpu()->id);
+        uart_puts(": Hello from S-mode!\n");
+    );
 
     // Create idle process for each CPU
     setup_idle_proc();
@@ -92,9 +92,9 @@ s_mode_main()
         idle_loop();
     }
 
-    spin_lock(&uart_lock);
-    uart_puts("End of s_mode_main()\n");
-    spin_unlock(&uart_lock);
+    DEBUG_PRINT(
+        uart_puts("End of s_mode_main()\n");
+    );
     while (1)
         asm volatile("wfi");
 }

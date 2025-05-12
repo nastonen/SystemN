@@ -17,10 +17,6 @@ read_time()
 static inline void
 timer_init()
 {
-    //spin_lock(&uart_lock);
-    //uart_puts("timer_init()\n");
-    //spin_unlock(&uart_lock);
-
     write_csr(stimecmp, read_time() + TIMER_INTERVAL);
 }
 
@@ -29,12 +25,12 @@ timer_handle()
 {
     write_csr(stimecmp, read_time() + TIMER_INTERVAL);
 
-    //spin_lock(&uart_lock);
-    //uart_puts("timer_handle()\n");
-    //spin_unlock(&uart_lock);
+    //DEBUG_PRINT(
+      //  uart_puts("timer_handle()\n");
+    //);
 
     cpu_t *c = curr_cpu();
-    int sched = 0;
+    int need_sched = 0;
 
     list_node_t *pos, *tmp;
     list_for_each_safe(pos, tmp, &c->sleep_queue) {
@@ -43,20 +39,19 @@ timer_handle()
             list_del(&p->q_node);
             p->state = RUNNABLE;
             list_add_tail(&p->q_node, &c->run_queue);
+            need_sched = 1;
 
-            sched = 1;
-
-            spin_lock(&uart_lock);
-            uart_puts("CPU ");
-            uart_putc('0' + curr_cpu()->id);
-            uart_puts(": proc id ");
-            uart_putc('0' + p->pid);
-            uart_puts(" became runnable\n");
-            spin_unlock(&uart_lock);
+            DEBUG_PRINT(
+                uart_puts("CPU ");
+                uart_putc('0' + curr_cpu()->id);
+                uart_puts(": proc id ");
+                uart_putc('0' + p->pid);
+                uart_puts(" became runnable\n");
+            );
         }
     }
 
 
-    if (sched)
+    if (need_sched)
         curr_cpu()->needs_sched = 1;
 }

@@ -7,7 +7,7 @@ __attribute__((section(".text.user_shell_main"), used))
 void
 user_shell_main()
 {
-    char buf[INPUT_BUF_SIZE];
+    char buf[INPUT_BUF_SIZE] = "$ ";
 
     /*
     volatile char *uart = (char *)0x10000000;
@@ -23,11 +23,9 @@ user_shell_main()
         write(prompt, 2);
 
         // Read input (blocking)
-        int n = read(buf, sizeof(buf) - 1);
+        int n = read(&buf[2], sizeof(buf) - 1);
         if (n <= 0)
             continue;
-
-        buf[n] = '\0'; // null-terminate
 
         sleep(1000);
 

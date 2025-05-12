@@ -15,7 +15,9 @@ LINKER = kernel.ld
 
 # Flags
 CFLAGS = -march=rv64g -mabi=lp64 -nostdlib -fno-pic -mno-relax \
-         -mcmodel=medany -Wall -Wextra -O0 -g
+         -mcmodel=medany -Wall -Wextra -O0 -DDEBUG
+#-g
+
 LDFLAGS = -T $(LINKER)
 
 all: $(TARGET).bin

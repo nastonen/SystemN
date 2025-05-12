@@ -13,10 +13,10 @@ schedule()
     proc_t *old = c->proc;
     proc_t *new = NULL;
 
-    spin_lock(&uart_lock);
-    uart_putc('0' + c->id);
-    uart_puts(" schedule() run...\n");
-    spin_unlock(&uart_lock);
+    DEBUG_PRINT(
+        uart_putc('0' + c->id);
+        uart_puts(" schedule() run...\n");
+    );
 
     list_node_t *head = &c->run_queue;
     list_node_t *node = head->next;
@@ -27,13 +27,13 @@ schedule()
         list_del(&new->q_node);
         new->state = RUNNING;
 
-        spin_lock(&uart_lock);
-        uart_puts("new proc ");
-        uart_putc('0' + new->pid);
-        uart_puts(" found, switching to user code at ");
-        uart_puthex(new->tf->sepc);
-        uart_putc('\n');
-        spin_unlock(&uart_lock);
+        DEBUG_PRINT(
+            uart_puts("new proc ");
+            uart_putc('0' + new->pid);
+            uart_puts(" found, switching to user code at ");
+            uart_puthex(new->tf->sepc);
+            uart_putc('\n');
+        );
 
         if (!old->is_idle) {
             old->state = RUNNABLE;
@@ -42,10 +42,10 @@ schedule()
         c->proc = new;
     } else if (!old->is_idle) {
         // No runnable process, run idle
-        spin_lock(&uart_lock);
-        uart_putc('0' + c->id);
-        uart_puts(" switching to idle\n");
-        spin_unlock(&uart_lock);
+        DEBUG_PRINT(
+            uart_putc('0' + c->id);
+            uart_puts(" switching to idle\n");
+        );
 
         c->proc = &idle_procs[c->id];
     }
