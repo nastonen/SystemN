@@ -57,7 +57,6 @@ curr_cpu()
 }
 
 extern cpu_t cpus[NCPU];
-extern proc_t boot_procs[NCPU];
 extern proc_t idle_procs[NCPU];
 
 void idle_loop();

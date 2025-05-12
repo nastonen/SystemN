@@ -3,11 +3,9 @@
 #include "mem.h"
 #include "list.h"
 
-static int next_pid = 1;
-static spinlock_t pid_lock = SPINLOCK_INIT;
+static long next_pid = 1;
 
 cpu_t cpus[NCPU];
-proc_t boot_procs[NCPU];
 proc_t idle_procs[NCPU];
 
 void
@@ -38,10 +36,7 @@ create_proc()
         return NULL;
     }
 
-    spin_lock(&pid_lock);
-    p->pid = next_pid++;
-    spin_unlock(&pid_lock);
-
+    p->pid = ATOMIC_FETCH_AND_INC(&next_pid);
     p->bound_cpu = -1;
     p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
 

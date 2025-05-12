@@ -35,8 +35,7 @@ schedule()
         uart_putc('\n');
         spin_unlock(&uart_lock);
 
-        // only for boot proc, GET RID OF THIS!!!
-        if (old->pid > 0) {
+        if (!old->is_idle) {
             old->state = RUNNABLE;
             list_add_tail(&old->q_node, &c->run_queue);
         }

@@ -32,6 +32,17 @@
     asm volatile("csrc " #reg ", %0" :: "rK"(bit)); \
 })
 
+#define ATOMIC_FETCH_AND_INC(ptr) ({   \
+    long __old_val;                    \
+    asm volatile (                     \
+        "li t0, 1\n\t"                 \
+        "amoadd.d.aq %0, t0, (%1)\n\t" \
+        : "=r"(__old_val)              \
+        : "r"(ptr)                     \
+        : "t0", "memory");             \
+    __old_val;                         \
+})
+
 static inline ulong
 read_tp()
 {
