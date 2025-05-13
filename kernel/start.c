@@ -9,7 +9,6 @@
 #include "string.h"
 #include "sched.h"
 #include "mem.h"
-#include "shell.h"
 
 #define USER_STACK_SIZE 4096
 #define USER_STACK_TOP (USER_START + USER_STACK_SIZE)

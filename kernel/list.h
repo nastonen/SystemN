@@ -1,24 +1,5 @@
 #pragma once
 
-/*
- * Usage examples:
- *
- * list_node_t *pos, *tmp;
- * list_for_each_safe(pos, tmp, &cpu->run_queue) {
- *     proc_t *p = list_entry(pos, proc_t, q_node);
- *     ...
- * }
- *
- * // Add to head or tail
- * list_add(&p->q_node, &cpu->run_queue);
- * // or
- * list_add_tail(&p->q_node, &cpu->run_queue);
- *
- * // Remove from queue
- * list_del(&p->q_node);
- *
- */
-
 typedef struct list_node {
     struct list_node *prev;
     struct list_node *next;
@@ -83,4 +64,4 @@ list_in_queue(list_node_t *node)
 
 // Get the containing struct from node
 #define container_of(ptr, type, member) \
-    ((type *)((char *)(ptr) - (unsigned long)(&((type *)NULL)->member)))
+    ((type *)((char *)(ptr) - (char *)(&((type *)NULL)->member)))

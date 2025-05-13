@@ -1,4 +1,3 @@
-#include "shell.h"
 #include "user.h"
 
 #define INPUT_BUF_SIZE 128

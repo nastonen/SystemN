@@ -15,8 +15,14 @@ LINKER = kernel.ld
 
 # Flags
 CFLAGS = -march=rv64g -mabi=lp64 -nostdlib -fno-pic -mno-relax \
-         -mcmodel=medany -Wall -Wextra -O0 -DDEBUG
+         -mcmodel=medany -Wall -Wextra -O0 $(DEBUG_FLAGS)
 #-g
+
+ifeq ($(NODEBUG), 1)
+DEBUG_FLAGS =
+else
+DEBUG_FLAGS = -DDEBUG
+endif
 
 LDFLAGS = -T $(LINKER)
 
