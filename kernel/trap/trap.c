@@ -327,7 +327,7 @@ restore_and_sret(trap_frame_t *tf)
         "ld a3, 8*13(%0)\n"
         "ld a4, 8*14(%0)\n"
 
-        //"ld a5, 8*15(%0)\n"
+        "ld a5, 8*15(%0)\n"
 
         "ld a6, 8*16(%0)\n"
         "ld a7, 8*17(%0)\n"
