@@ -34,7 +34,7 @@ buddy_of(void *addr, int order)
 }
 
 void
-init_buddy_allocator(void *start, void *end)
+buddy_allocator_init(void *start, void *end)
 {
     ulong curr = (ulong)start;
     ulong limit = (ulong)end;

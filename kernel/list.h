@@ -7,7 +7,7 @@ typedef struct list_node {
 
 #define LIST_INIT(name) { &(name), &(name) }
 
-#define INIT_LIST_HEAD(ptr) do { \
+#define LIST_HEAD_INIT(ptr) do { \
     (ptr)->next = (ptr);         \
     (ptr)->prev = (ptr);         \
 } while (0)

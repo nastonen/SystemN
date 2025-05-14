@@ -22,7 +22,7 @@ typedef struct page {
     struct page *next;
 } page_t;
 
-void init_buddy_allocator(void *start, void *end);
+void buddy_allocator_init(void *start, void *end);
 void *alloc_page(void);
 void *alloc_pages(int order);
 void free_page(void *ptr);

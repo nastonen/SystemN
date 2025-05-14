@@ -111,7 +111,7 @@ start()
 
     if (c->id == 0) {
         // Initialize global kernel memory allocator
-        init_buddy_allocator(_kernel_end, (void *)KERNEL_END);
+        buddy_allocator_init(_kernel_end, (void *)KERNEL_END);
         // SystemN Unified Buddy allocator :)
         snub_init();
         allocator_ready = 1;
@@ -122,8 +122,8 @@ start()
     }
 
     // Create per-CPU process queues
-    INIT_LIST_HEAD(&cpus[c->id].run_queue);
-    INIT_LIST_HEAD(&cpus[c->id].sleep_queue);
+    LIST_HEAD_INIT(&cpus[c->id].run_queue);
+    LIST_HEAD_INIT(&cpus[c->id].sleep_queue);
 
     // Halt all harts except 0
     //if (hart_id != 0)
