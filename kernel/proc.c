@@ -1,6 +1,6 @@
 #include "proc.h"
 #include "uart.h"
-#include "mem.h"
+#include "mm/snub.h"
 #include "list.h"
 
 static long next_pid = 1;

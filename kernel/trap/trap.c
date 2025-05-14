@@ -61,6 +61,8 @@ syscall_handler(proc_t *p)
         DEBUG_PRINT(
             uart_puts("SYS_exit\n");
         );
+        p->state = ZOMBIE;
+        c->needs_sched = 1;
         break;
     case SYS_getpid:
         DEBUG_PRINT(

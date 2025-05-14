@@ -32,5 +32,6 @@ user_shell_main()
         write(buf, n);
 
         yield();
+        //exit();
     }
 }

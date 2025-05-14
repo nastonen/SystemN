@@ -17,4 +17,3 @@ typedef unsigned char   uchar;
 #else
 #define DEBUG_PRINT(...) do {} while (0)
 #endif
-

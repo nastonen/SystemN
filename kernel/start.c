@@ -8,7 +8,7 @@
 #include "syscall.h"
 #include "string.h"
 #include "sched.h"
-#include "mem.h"
+#include "mm/snub.h"
 
 #define USER_STACK_SIZE 4096
 #define USER_STACK_TOP (USER_START + USER_STACK_SIZE)
@@ -111,7 +111,9 @@ start()
 
     if (c->id == 0) {
         // Initialize global kernel memory allocator
-        init_allocator(_kernel_end, (void *)KERNEL_END);
+        init_buddy_allocator(_kernel_end, (void *)KERNEL_END);
+        // SystemN Unified Buddy allocator :)
+        snub_init();
         allocator_ready = 1;
     } else {
         // Wait for hart 0 to finish allocator init
