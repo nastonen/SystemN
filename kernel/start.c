@@ -9,26 +9,73 @@
 #include "string.h"
 #include "sched.h"
 #include "mm/snub.h"
+#include "mm/pagetable.h"
 
-#define USER_STACK_SIZE 4096
-#define USER_STACK_TOP (USER_START + USER_STACK_SIZE)
+static pte_t kernel_pagetable[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
+//pte_t *kernel_pagetable = NULL;
 
 volatile int allocator_ready = 0;
+
 extern char _kernel_end[];
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
 
+
+/*
+ * Virtual Address (Sv39): 39 bits
+ *   | 9 bits | 9 bits | 9 bits | 12 bits |
+ *   |  VPN2  |  VPN1  |  VPN0  |  Offset |
+ *
+ * Levels:   L2      →     L1      →     L0
+ *           pagetable
+ */
+void
+setup_kernel_pagetable()
+{
+    //kernel_pagetable = alloc_pagetable();
+    //kernel_pagetable = kernel_pagetable_data;
+    memset((void *)kernel_pagetable, 0, PAGE_SIZE);
+
+    //kernel_pagetable = (pte_t *)KERNEL_PAGETABLE_ADDR;
+    //memset((void *)kernel_pagetable, 0, PAGE_SIZE);
+
+    uart_puts("Allocated kernel_pagetable at ");
+    uart_puthex((ulong)kernel_pagetable);
+    uart_putc('\n');
+
+    uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
+    for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
+        if (map_page(kernel_pagetable, pa, pa, PTE_R | PTE_W | PTE_X) == -1) {
+            uart_puts("map_page() failed for kernel, halting...\n");
+            while (1)
+                asm volatile("wfi");
+        }
+    }
+
+    // Map UART
+    if (map_page(kernel_pagetable, UART0, UART0, PTE_R | PTE_W) == -1) {
+        uart_puts("map_page() failed for UART, halting...\n");
+        while (1)
+            asm volatile("wfi");
+    }
+
+    // Flush TLB
+    asm volatile("sfence.vma zero, zero");
+}
+
 void
 shell_init()
 {
-    proc_t *shell = create_proc();
+    ulong size = _binary_shell_bin_end - _binary_shell_bin_start;
+    proc_t *shell = create_proc(_binary_shell_bin_start, size);
+
     list_del(&shell->q_node);
     shell->state = RUNNING;
     shell->bound_cpu = 0;
 
     // Copy user code to USER_START
-    uint user_code_size = _binary_shell_bin_end - _binary_shell_bin_start;
-    memcpy((void *)USER_START, _binary_shell_bin_start, user_code_size);
+    //uint user_code_size = _binary_shell_bin_end - _binary_shell_bin_start;
+    //memcpy((void *)USER_START, _binary_shell_bin_start, user_code_size);
 
     curr_cpu()->proc = shell;
 }
@@ -109,26 +156,45 @@ start()
     cpu_t *c = curr_cpu();
     c->id = hart_id;
 
+    // Halt all harts except 0
+    if (hart_id != 0)
+        while (1)
+            asm volatile("wfi");
+
     if (c->id == 0) {
         // Initialize global kernel memory allocator
-        buddy_allocator_init(_kernel_end, (void *)KERNEL_END);
+        if (buddy_allocator_init()) {
+            DEBUG_PRINT(
+                uart_puts("Kernel grew too big (over 4MB)! Abort!\n");
+            );
+            while (1)
+                asm volatile("wfi");
+        }
         // SystemN Unified Buddy allocator :)
         snub_init();
+
+        // Map phys mem to virt in kernel
+        setup_kernel_pagetable();
+
+        // Use kernel page table
+        load_pagetable(kernel_pagetable);
+
+        __sync_synchronize();
         allocator_ready = 1;
     } else {
         // Wait for hart 0 to finish allocator init
         while (!allocator_ready)
             asm volatile("nop");
+
+        __sync_synchronize();
+
+        // Use kernel page table
+        load_pagetable(kernel_pagetable);
     }
 
     // Create per-CPU process queues
     LIST_HEAD_INIT(&cpus[c->id].run_queue);
     LIST_HEAD_INIT(&cpus[c->id].sleep_queue);
-
-    // Halt all harts except 0
-    //if (hart_id != 0)
-      //  while (1)
-        //    asm volatile("wfi");
 
     // Delegate exceptions and interrupts to S-mode
     write_csr(medeleg, 0xffff);
@@ -156,13 +222,29 @@ start()
     set_csr(mcounteren, MCOUNTEREN_TIME);
     timer_init();
 
-    // Optional: disable paging for now
-    write_csr(satp, 0);
+    // Disable paging for now
+    //write_csr(satp, 0);
+
+    //uart_puthex((ulong)s_mode_main);
+    /*
+    pte_t *pte = walk(kernel_pagetable, 0x8000041c, 0);
+    if (pte && (*pte & PTE_V)) {
+        uart_puts("Mapped VA ");
+        uart_puthex(0x8000041c);
+        uart_puts(" to PA ");
+        uart_puthex((*pte >> 10) << PAGE_SHIFT);
+    } else {
+        uart_puts("error\n");
+    }
+    */
 
     // Set mepc to the address of S-mode entry point
     write_csr(mepc, (ulong)s_mode_main);
 
-    // Drop into S-mode!
-    //asm volatile("jalr x0, %0" : : "r"(s_mode_main));  // Jump directly to s_mode_main
+    DEBUG_PRINT(
+        uart_puts("jumping to S-mode!\n");
+    );
+
+    // Drop to S-mode!
     asm volatile("mret");
 }

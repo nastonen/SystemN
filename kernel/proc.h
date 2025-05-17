@@ -38,6 +38,7 @@ typedef struct proc {
     trap_frame_t *tf;
     context_t ctx;
     list_node_t q_node;
+    pte_t *pagetable;
 } proc_t;
 
 typedef struct cpu {
@@ -60,5 +61,5 @@ extern cpu_t cpus[NCPU];
 extern proc_t idle_procs[NCPU];
 
 void idle_loop();
-proc_t *create_proc();
+proc_t *create_proc(void *binary, ulong binary_size);
 void free_proc(proc_t *p);

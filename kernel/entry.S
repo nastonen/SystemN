@@ -9,12 +9,6 @@ _entry:
     mul   t3, t0, t1
     sub   sp, t2, t3
 
-    # Debug: print hart ID to UART
-    #li t2, 0x10000000  # UART0 base
-    #li t4, '0'
-    #add a0, t4, t0     # a0 = ASCII '0' + hartid
-    #sb a0, 0(t2)
-
     call start
 
 spin:

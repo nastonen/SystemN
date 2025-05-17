@@ -35,7 +35,7 @@ kmalloc(ulong size)
     spin_lock(&cache->lock);
 
     if (!cache->partial) {
-        // Allocate new snab page
+        // Allocate new snub page
         void *page = alloc_page();
         if (!page) {
             // Unlock spinlock
@@ -78,9 +78,9 @@ void
 kfree(void *ptr)
 {
     ulong addr = (ulong)ptr;
-    ulong offset = addr - PHYS_BASE;
+    ulong offset = addr - BUDDY_BASE_PHYS;
     int page_idx = offset / PAGE_SIZE;
-    ulong page_base = PHYS_BASE + (page_idx * PAGE_SIZE);
+    ulong page_base = BUDDY_BASE_PHYS + (page_idx * PAGE_SIZE);
     ulong diff = addr - page_base;
 
     // Guess object size by nearest size class

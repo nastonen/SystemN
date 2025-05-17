@@ -1,7 +1,9 @@
 #include "proc.h"
 #include "uart.h"
+#
 #include "mm/snub.h"
 #include "list.h"
+#include "mm/pagetable.h"
 
 static long next_pid = 1;
 
@@ -25,8 +27,12 @@ idle_loop()
 }
 
 proc_t *
-create_proc()
+create_proc(void *binary, ulong binary_size)
 {
+    DEBUG_PRINT(
+        uart_puts("create_proc()\n");
+    );
+
     proc_t *p = (proc_t *)kzalloc(sizeof(proc_t));
     if (!p) {
         DEBUG_PRINT(
@@ -35,16 +41,57 @@ create_proc()
 
         return NULL;
     }
+    DEBUG_PRINT(
+        uart_puts("create_proc() after kzalloc\n");
+    );
 
     p->pid = ATOMIC_FETCH_AND_INC(&next_pid);
     p->bound_cpu = -1;
     p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
+
+    // Allocate user page table
+    p->pagetable = alloc_pagetable();
+    if (!p->pagetable)
+        goto fail;
+
+    // Load user binary
+    ulong va = USER_START;
+    ulong remaining = binary_size;
+    uchar *src = (uchar *)binary;
+
+    while (remaining > 0) {
+        ulong pa = (ulong)alloc_page();
+        if (!pa)
+            goto fail;
+
+        ulong to_copy = (remaining > PAGE_SIZE) ? PAGE_SIZE : remaining;
+        memcpy((void *)pa, src, to_copy);
+        map_page(p->pagetable, va, pa, PTE_R | PTE_X | PTE_U);
+
+        va += PAGE_SIZE;
+        src += to_copy;
+        remaining -= to_copy;
+    }
+
+    // User stack (1 page)
+    ulong stack_pa = (ulong)alloc_page();
+    if (!stack_pa)
+        goto fail;
+    map_page(p->pagetable, USER_STACK_TOP - PAGE_SIZE, stack_pa, PTE_R | PTE_W | PTE_U);
+
+    // Map kernel segments (top half)
+    for (ulong va = KERNEL_START; va < KERNEL_END; va += PAGE_SIZE)
+        map_page(p->pagetable, va, va, PTE_R | PTE_W | PTE_X);
 
     // Put into RUNNABLE queue
     p->state = RUNNABLE;
     list_add_tail(&p->q_node, &cpus[curr_cpu()->id].run_queue);
 
     return p;
+
+fail:
+    free_proc(p);
+    return NULL;
 }
 
 void
