@@ -20,15 +20,6 @@ extern char _kernel_end[];
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
 
-
-/*
- * Virtual Address (Sv39): 39 bits
- *   | 9 bits | 9 bits | 9 bits | 12 bits |
- *   |  VPN2  |  VPN1  |  VPN0  |  Offset |
- *
- * Levels:   L2      →     L1      →     L0
- *           pagetable
- */
 void
 setup_kernel_pagetable()
 {
@@ -170,14 +161,15 @@ start()
             while (1)
                 asm volatile("wfi");
         }
-        // SystemN Unified Buddy allocator :)
-        snub_init();
 
         // Map phys mem to virt in kernel
         setup_kernel_pagetable();
 
         // Use kernel page table
         load_pagetable(kernel_pagetable);
+
+        // SystemN Unified Buddy allocator :)
+        snub_init();
 
         __sync_synchronize();
         allocator_ready = 1;

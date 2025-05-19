@@ -127,9 +127,11 @@ alloc_pages(int order)
             continue;
         }
 
+        /*
         uart_puts("allocating from order: ");
         uart_putlong(o);
         uart_putc('\n');
+        */
 
         // Pop from freelist
         page_t *block = free_lists[o];

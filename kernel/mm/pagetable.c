@@ -9,28 +9,44 @@ vpn_level(ulong va, int level)
     return (va >> (PAGE_SHIFT + 9 * level)) & 0x1FF;
 }
 
+/*
+ * Virtual Address (Sv39): 39 bits
+ *   | 9 bits | 9 bits | 9 bits | 12 bits |
+ *   |  VPN2  |  VPN1  |  VPN0  |  Offset |
+ *
+ * Levels:   L2      →     L1      →     L0
+ *           pagetable
+ */
 pte_t *
 walk(pte_t *pagetable, ulong va, int alloc)
 {
     for (int level = 2; level > 0; level--) {
         uint idx = vpn_level(va, level);
+        /*
         if (idx >= PAGE_ENTRIES) {
             uart_puts("vpn index overflow!\n");
             return NULL;
         }
+        */
+
         pte_t *pte = &pagetable[idx];
 
         if (*pte & PTE_V) {
             pagetable = (pte_t *)(((*pte >> 10) << PAGE_SHIFT));
         } else {
-            uart_puts("current level not valid!\n");
-
-            if (!alloc)
+            //uart_puts("current level not valid!\n");
+            if (!alloc){
+                DEBUG_PRINT(
+                    uart_puts("walk(): access to pagetable failed\n");
+                );
                 return NULL;
+            }
 
             void *new_pg = alloc_page();
             if (!new_pg) {
-                uart_puts("alloc_page failed in walk()\n");
+                DEBUG_PRINT(
+                    uart_puts("alloc_page failed in walk()\n");
+                );
                 return NULL;
             }
 
