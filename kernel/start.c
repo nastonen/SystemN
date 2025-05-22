@@ -11,9 +11,6 @@
 #include "mm/snub.h"
 #include "mm/pagetable.h"
 
-static pte_t kernel_pagetable[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
-//pte_t *kernel_pagetable = NULL;
-
 volatile int allocator_ready = 0;
 
 extern char _kernel_end[];
@@ -23,12 +20,7 @@ extern char _binary_shell_bin_end[];
 void
 setup_kernel_pagetable()
 {
-    //kernel_pagetable = alloc_pagetable();
-    //kernel_pagetable = kernel_pagetable_data;
     memset((void *)kernel_pagetable, 0, PAGE_SIZE);
-
-    //kernel_pagetable = (pte_t *)KERNEL_PAGETABLE_ADDR;
-    //memset((void *)kernel_pagetable, 0, PAGE_SIZE);
 
     uart_puts("Allocated kernel_pagetable at ");
     uart_puthex((ulong)kernel_pagetable);
@@ -64,10 +56,6 @@ shell_init()
     shell->state = RUNNING;
     shell->bound_cpu = 0;
 
-    // Copy user code to USER_START
-    //uint user_code_size = _binary_shell_bin_end - _binary_shell_bin_start;
-    //memcpy((void *)USER_START, _binary_shell_bin_start, user_code_size);
-
     curr_cpu()->proc = shell;
 }
 
@@ -92,12 +80,25 @@ setup_idle_proc()
 
 void jump_to_user_shell()
 {
+    DEBUG_PRINT(uart_puts("Jumping to user shell\n"););
+
+    proc_t *p = curr_cpu()->proc;
+
+    write_csr(satp, MAKE_SATP(p->pagetable));
+    asm volatile("sfence.vma zero, zero");
+
     // Setup SSTATUS: SPIE=1 (enable interrupts)
-    write_csr(sstatus, (ulong)SSTATUS_SPIE);
+    //                SUM=1 (protect U-memory from S-mode)
+    write_csr(sstatus, SSTATUS_SPIE | SSTATUS_SUM);
+    // Set return mode = user
+    clear_csr(sstatus, SSTATUS_SPP);
+
     // Set exception return PC
     write_csr(sepc, (ulong)USER_START);
     // Set up user registers (only sp is required here)
     register ulong sp asm("sp") = (ulong)USER_STACK_TOP;
+
+    //clear_csr(sstatus, SSTATUS_SUM);
 
     asm volatile(
         "mv sp, %0\n"

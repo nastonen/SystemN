@@ -40,6 +40,10 @@ schedule()
             list_add_tail(&old->q_node, &c->run_queue);
         }
         c->proc = new;
+
+        write_csr(satp, MAKE_SATP(c->proc->pagetable));
+        asm volatile("sfence.vma zero, zero");
+        swtch(&old->ctx, &c->proc->ctx);
     } else if (!old->is_idle) {
         // No runnable process, run idle
         DEBUG_PRINT(
@@ -48,7 +52,9 @@ schedule()
         );
 
         c->proc = &idle_procs[c->id];
-    }
 
-    swtch(&old->ctx, &c->proc->ctx);
+        write_csr(satp, MAKE_SATP(c->proc->pagetable));
+        asm volatile("sfence.vma zero, zero");
+        swtch(&old->ctx, &c->proc->ctx);
+    }
 }

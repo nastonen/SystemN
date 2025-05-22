@@ -3,8 +3,14 @@
 #include "riscv.h"
 #include "list.h"
 
-#define NCPU        4  // number of CPUs
-#define KSTACK_SIZE 4096
+#define NCPU            4  // number of CPUs
+#define KSTACK_SIZE     4096
+
+// Extract physical address from a PTE
+#define PTE2PA(pte)     (((pte) >> 10) << 12)
+
+// Extract permission/flag bits from a PTE
+#define PTE_FLAGS(pte)  ((pte) & 0x3FF)  // bits [9:0]
 
 typedef struct trap_frame {
     ulong regs[32];     // x0 - x31

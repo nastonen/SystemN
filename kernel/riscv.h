@@ -6,6 +6,7 @@
 #define SSTATUS_SPP         (1UL << 8)
 #define SSTATUS_SPIE        (1UL << 5)
 #define SSTATUS_UPIE        (0UL << 8)
+#define SSTATUS_SUM         (1UL << 18)
 
 #define SIE_STIE            (1UL << 5)
 #define MENVCFG_FDT         (1UL << 63)

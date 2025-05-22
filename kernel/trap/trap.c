@@ -124,6 +124,20 @@ s_trap_handler(trap_frame_t *tf)
     ulong cause = read_csr(scause);
     ulong code  = SCAUSE_CODE(cause);
 
+    DEBUG_PRINT(
+        uart_puts("Trap: ");
+        uart_puthex(code);
+        uart_putc('\n');
+
+        uart_puts("sepc: ");
+        uart_puthex(read_csr(sepc));
+        uart_puts("\n");
+
+        uart_puts("stval: ");
+        uart_puthex(read_csr(stval));
+        uart_puts("\n");
+    );
+
     // Must not access tf on idle process, it is NULL!
     if (p && p->is_idle) {
         // Timer interrupt on idle core
@@ -139,22 +153,6 @@ s_trap_handler(trap_frame_t *tf)
                 asm volatile("wfi");
         }
     }
-
-    /*
-    DEBUG_PRINT(
-        uart_puts("Trap: ");
-        uart_puthex(code);
-        uart_putc('\n');
-
-        uart_puts("sepc: ");
-        uart_puthex(read_csr(sepc));
-        uart_puts("\n");
-
-        uart_puts("stval: ");
-        uart_puthex(read_csr(stval));
-        uart_puts("\n");
-    );
-    */
 
     if (SCAUSE_CODE(tf->scause) == 5 && !(tf->scause & SCAUSE_IRQ_BIT)) {
         DEBUG_PRINT(

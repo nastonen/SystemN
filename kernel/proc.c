@@ -26,6 +26,30 @@ idle_loop()
         asm volatile("wfi");  // Wait for interrupt
 }
 
+void
+copy_kernel_mappings(pte_t *dst, pte_t *src)
+{
+    // Copy all mappings from KERNEL_START to KERNEL_END
+    for (ulong va = KERNEL_START; va < KERNEL_END; va += PAGE_SIZE) {
+        pte_t *src_pte = walk(src, va, 0);
+        if (!src_pte || !(*src_pte & PTE_V)) {
+            uart_puts("copy_kernel_mappings: missing PTE at ");
+            uart_puthex(va);
+            uart_putc('\n');
+            continue;
+        }
+
+        ulong pa = PTE2PA(*src_pte);
+        ulong flags = PTE_FLAGS(*src_pte);
+
+        if (map_page(dst, va, pa, flags) != 0) {
+            uart_puts("copy_kernel_mappings: map_page failed at ");
+            uart_puthex(va);
+            uart_putc('\n');
+        }
+    }
+}
+
 proc_t *
 create_proc(void *binary, ulong binary_size)
 {
@@ -41,10 +65,6 @@ create_proc(void *binary, ulong binary_size)
 
         return NULL;
     }
-    DEBUG_PRINT(
-        uart_puts("create_proc() after kzalloc\n");
-    );
-
     p->pid = ATOMIC_FETCH_AND_INC(&next_pid);
     p->bound_cpu = -1;
     p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
@@ -79,9 +99,17 @@ create_proc(void *binary, ulong binary_size)
         goto fail;
     map_page(p->pagetable, USER_STACK_TOP - PAGE_SIZE, stack_pa, PTE_R | PTE_W | PTE_U);
 
-    // Map kernel segments (top half)
-    for (ulong va = KERNEL_START; va < KERNEL_END; va += PAGE_SIZE)
-        map_page(p->pagetable, va, va, PTE_R | PTE_W | PTE_X);
+    // Map kernel segments
+    copy_kernel_mappings(p->pagetable, kernel_pagetable);
+    //for (ulong va = KERNEL_START; va < KERNEL_END; va += PAGE_SIZE)
+        //map_page(p->pagetable, va, va, PTE_R | PTE_W | PTE_X);
+
+    // Map UART
+    if (map_page(p->pagetable, UART0, UART0, PTE_R | PTE_W) == -1) {
+        uart_puts("map_page() failed for UART, halting...\n");
+        while (1)
+            asm volatile("wfi");
+    }
 
     // Put into RUNNABLE queue
     p->state = RUNNABLE;
@@ -90,6 +118,7 @@ create_proc(void *binary, ulong binary_size)
     return p;
 
 fail:
+    DEBUG_PRINT(uart_puts("Process creation failed. Return NULL.\n"););
     free_proc(p);
     return NULL;
 }

@@ -7,6 +7,9 @@ static spinlock_t buddy_lock = SPINLOCK_INIT;
 static page_t page_array[NUM_PAGES];
 static page_t *free_lists[MAX_ORDER + 1];
 
+__attribute__((aligned(PAGE_SIZE)))
+pte_t kernel_pagetable[PAGE_ENTRIES];
+
 static inline ulong
 page_idx(void *addr)
 {
