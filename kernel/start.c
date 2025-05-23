@@ -22,10 +22,6 @@ setup_kernel_pagetable()
 {
     memset((void *)kernel_pagetable, 0, PAGE_SIZE);
 
-    uart_puts("Allocated kernel_pagetable at ");
-    uart_puthex((ulong)kernel_pagetable);
-    uart_putc('\n');
-
     uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
     for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
         if (map_page(kernel_pagetable, pa, pa, PTE_R | PTE_W | PTE_X) == -1) {
@@ -69,6 +65,7 @@ setup_idle_proc()
     //idle->pid = 0;
     idle->is_idle = 1;
     idle->state = RUNNING;
+    idle->pagetable = kernel_pagetable;
 
     // Set context
     idle->ctx.ra = (ulong)idle_loop;
@@ -92,9 +89,9 @@ void jump_to_user_shell()
     write_csr(sstatus, SSTATUS_SPIE | SSTATUS_SUM);
     // Set return mode = user
     clear_csr(sstatus, SSTATUS_SPP);
-
     // Set exception return PC
     write_csr(sepc, (ulong)USER_START);
+
     // Set up user registers (only sp is required here)
     register ulong sp asm("sp") = (ulong)USER_STACK_TOP;
 
@@ -130,9 +127,7 @@ s_mode_main()
         idle_loop();
     }
 
-    DEBUG_PRINT(
-        uart_puts("End of s_mode_main()\n");
-    );
+    DEBUG_PRINT(uart_puts("End of s_mode_main()\n"););
     while (1)
         asm volatile("wfi");
 }
@@ -192,11 +187,11 @@ start()
     // Delegate exceptions and interrupts to S-mode
     write_csr(medeleg, 0xffff);
     write_csr(mideleg, 0xffff);
-    //ulong sie = read_csr(sie);
-    //write_csr(sie, sie | (1L << 9) | (1L << 5) | (1L << 1));
 
     // Setup PMP to give S-mode access to all memory
-    write_csr(pmpaddr0, -1L);   // Top of memory range (all memory)
+    //ulong onlyUserMem = (0x84000000 >> 2) | ((1 << (26 - 2)) - 1); // NAPOT for 64 MiB
+    ulong allMem = -1L; // Top of memory range (all memory)
+    write_csr(pmpaddr0, allMem); //onlyUserMem);
     write_csr(pmpcfg0, 0x0f);   // R/W/X permissions, TOR mode
 
     // Set S-mode trap vector
@@ -209,6 +204,9 @@ start()
     // Enable interrupts in S-mode
     set_csr(sstatus, SSTATUS_SIE);
 
+    // Enable external interrupts
+    //set_csr(sie, (1L << 9));
+
     // Init timer interrupts
     set_csr(sie, SIE_STIE);
     set_csr(menvcfg, MENVCFG_FDT);
@@ -218,25 +216,8 @@ start()
     // Disable paging for now
     //write_csr(satp, 0);
 
-    //uart_puthex((ulong)s_mode_main);
-    /*
-    pte_t *pte = walk(kernel_pagetable, 0x8000041c, 0);
-    if (pte && (*pte & PTE_V)) {
-        uart_puts("Mapped VA ");
-        uart_puthex(0x8000041c);
-        uart_puts(" to PA ");
-        uart_puthex((*pte >> 10) << PAGE_SHIFT);
-    } else {
-        uart_puts("error\n");
-    }
-    */
-
     // Set mepc to the address of S-mode entry point
     write_csr(mepc, (ulong)s_mode_main);
-
-    DEBUG_PRINT(
-        uart_puts("jumping to S-mode!\n");
-    );
 
     // Drop to S-mode!
     asm volatile("mret");

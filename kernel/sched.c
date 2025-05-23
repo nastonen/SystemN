@@ -2,6 +2,7 @@
 #include "proc.h"
 #include "uart.h"
 #include "list.h"
+#include "mm/mem.h"
 
 // Forward declaration
 void swtch(context_t *old, context_t *new);
