@@ -42,8 +42,7 @@ schedule()
         }
         c->proc = new;
 
-        write_csr(satp, MAKE_SATP(c->proc->pagetable));
-        asm volatile("sfence.vma zero, zero");
+        load_pagetable(c->proc->pagetable);
         swtch(&old->ctx, &c->proc->ctx);
     } else if (!old->is_idle) {
         // No runnable process, run idle
@@ -54,8 +53,7 @@ schedule()
 
         c->proc = &idle_procs[c->id];
 
-        write_csr(satp, MAKE_SATP(c->proc->pagetable));
-        asm volatile("sfence.vma zero, zero");
+        load_pagetable(c->proc->pagetable);
         swtch(&old->ctx, &c->proc->ctx);
     }
 }

@@ -27,6 +27,28 @@ idle_loop()
 }
 
 void
+dump_mappings(pte_t *pagetable, ulong start_va, ulong end_va)
+{
+    for (ulong va = start_va; va < end_va; va += PAGE_SIZE) {
+        pte_t *pte = walk(pagetable, va, 0);
+        if (!pte || !(*pte & PTE_V)) {
+            uart_puts("VA not mapped: ");
+            uart_puthex(va);
+            uart_putc('\n');
+            continue;
+        }
+
+        uart_puts("VA: ");
+        uart_puthex(va);
+        uart_puts(" -> PA: ");
+        uart_puthex(PTE2PA(*pte));
+        uart_puts(" Flags: ");
+        uart_puthex(PTE_FLAGS(*pte));
+        uart_putc('\n');
+    }
+}
+
+void
 copy_kernel_mappings(pte_t *dst, pte_t *src)
 {
     // Copy all mappings from KERNEL_START to KERNEL_END
@@ -110,6 +132,10 @@ create_proc(void *binary, ulong binary_size)
         while (1)
             asm volatile("wfi");
     }
+
+    //dump_mappings(p->pagetable, USER_STACK_TOP - PAGE_SIZE, USER_STACK_TOP);
+    //dump_mappings(p->pagetable, KERNEL_START, KERNEL_END);
+    //dump_mappings(p->pagetable, UART0, UART0 + PAGE_SIZE);
 
     // Put into RUNNABLE queue
     p->state = RUNNABLE;
