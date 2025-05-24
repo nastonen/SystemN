@@ -9,7 +9,7 @@ spin_lock(spinlock_t *lock)
     if (c->lock_depth == 0) {
         // Save current interrupt state and disable interrupts
         c->sstatus = read_csr(sstatus);
-        write_csr(sstatus, c->sstatus & ~(1UL << 1));  // Clear SIE
+        clear_csr(sstatus, SSTATUS_SIE); // Clear SIE
 
     }
     c->lock_depth++;
@@ -25,7 +25,7 @@ spin_trylock(spinlock_t *lock)
     if (c->lock_depth == 0) {
         // Save current interrupt state and disable interrupts
         c->sstatus = read_csr(sstatus);
-        write_csr(sstatus, c->sstatus & ~(1UL << 1));  // Clear SIE
+        clear_csr(sstatus, SSTATUS_SIE); // Clear SIE
 
     }
     c->lock_depth++;
