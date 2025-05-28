@@ -31,11 +31,12 @@ timer_handle()
 
     cpu_t *c = curr_cpu();
     int need_sched = 0;
+    ulong now = read_time();
 
     list_node_t *pos, *tmp;
     list_for_each_safe(pos, tmp, &c->sleep_queue) {
         proc_t *p = container_of(pos, proc_t, q_node);
-        if (read_time() >= p->sleep_until) {
+        if (now >= p->sleep_until) {
             list_del(&p->q_node);
             p->state = RUNNABLE;
             list_add_tail(&p->q_node, &c->run_queue);
