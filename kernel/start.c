@@ -66,6 +66,7 @@ setup_idle_proc()
     idle->is_idle = 1;
     idle->state = RUNNING;
     idle->pagetable = kernel_pagetable;
+    idle->kstack = idle_stack[c->id];
 
     // Set context
     idle->ctx.ra = (ulong)idle_loop;

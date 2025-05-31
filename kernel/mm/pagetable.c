@@ -89,6 +89,9 @@ alloc_pagetable(void)
 void
 load_pagetable(pte_t *pagetable)
 {
+    // Flush TLB
+    asm volatile ("sfence.vma zero, zero");
+
     write_csr(satp, MAKE_SATP(pagetable));
 
     // Flush TLB

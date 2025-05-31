@@ -39,7 +39,7 @@ typedef struct proc {
     enum proc_state state;
     int is_idle;
     int bound_cpu;
-    char kstack[KSTACK_SIZE];
+    char *kstack;
     ulong sleep_until;
     trap_frame_t *tf;
     context_t ctx;
@@ -65,6 +65,7 @@ curr_cpu()
 
 extern cpu_t cpus[NCPU];
 extern proc_t idle_procs[NCPU];
+extern char idle_stack[NCPU][KSTACK_SIZE];
 
 void idle_loop();
 proc_t *create_proc(void *binary, ulong binary_size);

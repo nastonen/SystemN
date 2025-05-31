@@ -8,6 +8,7 @@ static long next_pid = 1;
 
 cpu_t cpus[NCPU];
 proc_t idle_procs[NCPU];
+char idle_stack[NCPU][KSTACK_SIZE];
 
 void
 idle_loop()
@@ -80,15 +81,19 @@ create_proc(void *binary, ulong binary_size)
 
     proc_t *p = (proc_t *)kzalloc(sizeof(proc_t));
     if (!p) {
-        DEBUG_PRINT(
-            uart_puts("Process creation failed. Return NULL.\n");
-        );
-
+        DEBUG_PRINT(uart_puts("Process creation failed. Return NULL.\n"););
         return NULL;
     }
     p->pid = ATOMIC_FETCH_AND_INC(&next_pid);
     p->bound_cpu = -1;
+
+    p->kstack = (char *)kzalloc(KSTACK_SIZE);
+    if (!p->kstack)
+        goto fail;
+
     p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
+    p->ctx.sp = (ulong)p->tf - sizeof(context_t);
+    //p->ctx.ra = (ulong)proc_trampoline;
 
     // Allocate user page table
     p->pagetable = alloc_pagetable();
@@ -107,7 +112,8 @@ create_proc(void *binary, ulong binary_size)
 
         ulong to_copy = (remaining > PAGE_SIZE) ? PAGE_SIZE : remaining;
         memcpy((void *)pa, src, to_copy);
-        map_page(p->pagetable, va, pa, PTE_R | PTE_X | PTE_U);
+        if (map_page(p->pagetable, va, pa, PTE_R | PTE_X | PTE_U) == -1)
+            goto fail;
 
         va += PAGE_SIZE;
         src += to_copy;
@@ -118,7 +124,8 @@ create_proc(void *binary, ulong binary_size)
     ulong stack_pa = (ulong)alloc_page();
     if (!stack_pa)
         goto fail;
-    map_page(p->pagetable, USER_STACK_TOP - PAGE_SIZE, stack_pa, PTE_R | PTE_W | PTE_U);
+    if (map_page(p->pagetable, USER_STACK_TOP - PAGE_SIZE, stack_pa, PTE_R | PTE_W | PTE_U) == -1)
+        goto fail;
 
     // Map kernel segments
     copy_kernel_mappings(p->pagetable, kernel_pagetable);
@@ -157,6 +164,14 @@ free_proc(proc_t *p)
     // If it's in a queue, remove it
     if (list_in_queue(&p->q_node))
         list_del(&p->q_node);
+
+    // Free user page table
+    if (p->pagetable)
+        free_pagetable(p->pagetable);
+
+    // Free kernel stack
+    if (p->kstack)
+        kfree(p->kstack);
 
     kfree(p);
 }

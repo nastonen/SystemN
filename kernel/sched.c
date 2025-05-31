@@ -5,7 +5,7 @@
 #include "mm/mem.h"
 
 // Forward declaration
-void swtch(context_t *old, context_t *new);
+void swtch(context_t *old, context_t *new, pte_t *pagetable);
 
 void
 schedule()
@@ -42,8 +42,8 @@ schedule()
         }
         c->proc = new;
 
-        load_pagetable(c->proc->pagetable);
-        swtch(&old->ctx, &c->proc->ctx);
+        //load_pagetable(c->proc->pagetable);
+        swtch(&old->ctx, &c->proc->ctx, c->proc->pagetable);
     } else if (!old->is_idle) {
         // No runnable process, run idle
         DEBUG_PRINT(
@@ -53,7 +53,7 @@ schedule()
 
         c->proc = &idle_procs[c->id];
 
-        load_pagetable(c->proc->pagetable);
-        swtch(&old->ctx, &c->proc->ctx);
+        //load_pagetable(kernel_pagetable);
+        swtch(&old->ctx, &c->proc->ctx, kernel_pagetable);
     }
 }
