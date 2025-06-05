@@ -2,7 +2,7 @@
 .global _entry
 _entry:
     # set up a stack for C.
-    # sp = stack_end + (hartId * 4096)
+    # sp = stack_end - (hartId * 4096)
     csrr  t0, mhartid
     li    t1, 4096
     la    t2, stack_end

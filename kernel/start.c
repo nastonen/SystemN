@@ -80,6 +80,8 @@ void jump_to_user_shell()
 {
     DEBUG_PRINT(uart_puts("Jumping to user shell\n"););
 
+    proc_t *p = curr_cpu()->proc;
+
     // Setup SSTATUS: SPIE=1 (enable interrupts)
     //                SUM=1 (protect U-memory from S-mode)
     write_csr(sstatus, SSTATUS_SPIE | SSTATUS_SUM);
@@ -87,8 +89,10 @@ void jump_to_user_shell()
     clear_csr(sstatus, SSTATUS_SPP);
     // Set exception return PC
     write_csr(sepc, (ulong)USER_START);
+    // Save trap frame
+    write_csr(sscratch, (ulong)p->tf);
 
-    load_pagetable(curr_cpu()->proc->pagetable);
+    load_pagetable(p->pagetable);
 
     // Set up user registers (only sp is required here)
     register ulong sp asm("sp") = (ulong)USER_STACK_TOP;
@@ -142,9 +146,9 @@ start()
     c->id = hart_id;
 
     // Halt all harts except 0
-    if (hart_id != 0)
-        while (1)
-            asm volatile("wfi");
+    //if (hart_id != 0)
+      //  while (1)
+        //    asm volatile("wfi");
 
     if (c->id == 0) {
         // Initialize global kernel memory allocator

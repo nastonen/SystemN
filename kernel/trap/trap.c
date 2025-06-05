@@ -124,6 +124,7 @@ s_trap_handler(trap_frame_t *tf)
     ulong cause = read_csr(scause);
     ulong code  = SCAUSE_CODE(cause);
 
+    /*
     DEBUG_PRINT(
         uart_puts("Trap: ");
         uart_puthex(code);
@@ -137,6 +138,7 @@ s_trap_handler(trap_frame_t *tf)
         uart_puthex(read_csr(stval));
         uart_puts("\n");
     );
+    */
 
     // Must not access tf on idle process, it is NULL!
     if (p && p->is_idle) {
@@ -144,7 +146,6 @@ s_trap_handler(trap_frame_t *tf)
         if ((cause & SCAUSE_IRQ_BIT) && code == SCAUSE_TIMER_INTERRUPT) {
             timer_handle();
             goto end;
-            //return;
         } else {
             DEBUG_PRINT(
                 uart_puts("Trap on idle core? Should not happen, Halting...\n");

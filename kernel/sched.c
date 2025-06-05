@@ -42,7 +42,12 @@ schedule()
         }
         c->proc = new;
 
-        //load_pagetable(c->proc->pagetable);
+        // Load page table for new process
+        load_pagetable(c->proc->pagetable);
+
+        // Save trap frame
+        write_csr(sscratch, c->proc->tf);
+
         swtch(&old->ctx, &c->proc->ctx, c->proc->pagetable);
     } else if (!old->is_idle) {
         // No runnable process, run idle
@@ -53,7 +58,6 @@ schedule()
 
         c->proc = &idle_procs[c->id];
 
-        //load_pagetable(kernel_pagetable);
         swtch(&old->ctx, &c->proc->ctx, kernel_pagetable);
     }
 }

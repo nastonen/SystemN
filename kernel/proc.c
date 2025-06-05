@@ -10,6 +10,19 @@ cpu_t cpus[NCPU];
 proc_t idle_procs[NCPU];
 char idle_stack[NCPU][KSTACK_SIZE];
 
+/*
+// Forward declaration
+void userret(trap_frame_t *tf);
+
+void
+proc_trampoline()
+{
+    proc_t *p = curr_cpu()->proc;
+    load_pagetable(p->pagetable);
+    userret(p->tf);  // This will drop into user mode at tf->sepc
+}
+*/
+
 void
 idle_loop()
 {
@@ -75,15 +88,12 @@ copy_kernel_mappings(pte_t *dst, pte_t *src)
 proc_t *
 create_proc(void *binary, ulong binary_size)
 {
-    DEBUG_PRINT(
-        uart_puts("create_proc()\n");
-    );
+    DEBUG_PRINT(uart_puts("create_proc()\n"););
 
     proc_t *p = (proc_t *)kzalloc(sizeof(proc_t));
-    if (!p) {
-        DEBUG_PRINT(uart_puts("Process creation failed. Return NULL.\n"););
-        return NULL;
-    }
+    if (!p)
+        goto fail1;
+
     p->pid = ATOMIC_FETCH_AND_INC(&next_pid);
     p->bound_cpu = -1;
 
@@ -92,7 +102,11 @@ create_proc(void *binary, ulong binary_size)
         goto fail;
 
     p->tf = (trap_frame_t *)(p->kstack + KSTACK_SIZE - sizeof(trap_frame_t));
-    p->ctx.sp = (ulong)p->tf - sizeof(context_t);
+    p->tf->regs[2] = USER_STACK_TOP;
+    p->tf->sepc = USER_START;
+    p->tf->sstatus = SSTATUS_SPIE | SSTATUS_SUM;
+
+    p->ctx.sp = (ulong)p->tf;
     //p->ctx.ra = (ulong)proc_trampoline;
 
     // Allocate user page table
@@ -150,8 +164,9 @@ create_proc(void *binary, ulong binary_size)
     return p;
 
 fail:
-    DEBUG_PRINT(uart_puts("Process creation failed. Return NULL.\n"););
     free_proc(p);
+fail1:
+    DEBUG_PRINT(uart_puts("Process creation failed. Return NULL.\n"););
     return NULL;
 }
 
