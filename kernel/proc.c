@@ -3,25 +3,13 @@
 #include "mm/snub.h"
 #include "list.h"
 #include "mm/pagetable.h"
+#include "trap/trap.h"
 
 static long next_pid = 1;
 
 cpu_t cpus[NCPU];
 proc_t idle_procs[NCPU];
 char idle_stack[NCPU][KSTACK_SIZE];
-
-/*
-// Forward declaration
-void userret(trap_frame_t *tf);
-
-void
-proc_trampoline()
-{
-    proc_t *p = curr_cpu()->proc;
-    load_pagetable(p->pagetable);
-    userret(p->tf);  // This will drop into user mode at tf->sepc
-}
-*/
 
 void
 idle_loop()
@@ -31,6 +19,9 @@ idle_loop()
         uart_putc('0' + curr_cpu()->id);
         uart_puts(": idle loop\n");
     );
+
+    // Set simplified trap vector
+    write_csr(stvec, idle_trap_vector);
 
     // Enable interrupts
     set_csr(sstatus, SSTATUS_SIE);

@@ -1,40 +1,34 @@
 .section .text
-.global s_trap_vector
-s_trap_vector:
-    # Optional: Save a7 for debug
-    # la t0, debug_a7
-    # sd x17, 0(t0)
-
+.global trap_vector
+trap_vector:
     # Save trap cause early
     csrr t1, scause
 
     # Check SPP bit in sstatus: 0 = user, 1 = supervisor
     csrr t0, sstatus
     andi t0, t0, (1 << 8)   # Check SPP bit (bit 8)
-    beqz t0, .from_user     # If SPP == 0 → from user mode
+    beqz t0, .from_user     # If SPP == 0 -> from user mode
     j .from_kernel
 
-# ------------------------------
 .from_user:
-    # Load trap frame base pointer (per-thread) from sscratch
+    # Load trap frame pointer from sscratch
     csrr t0, sscratch
 
     # Save user sp into trap frame (x2), offset 16
     sd sp, 16(t0)
 
-    # Move trap frame base to sp
+    # Move trap frame to sp
     mv sp, t0
     j .save_regs
 
-# ------------------------------
 .from_kernel:
     # We're already on kernel stack, use current sp directly
-    # Reserve space for trap frame (35 x 8 = 280 bytes)
+    # Reserve space for trap frame (36 x 8 = 288 bytes)
     addi sp, sp, -288
 
 .save_regs:
     # Save x1–x31 (excluding x0, and x2 already saved if from_user)
-    # sd x0     0(sp)     # x0 (hardwired zero)
+    # sd x0     0(sp)   # x0 (hardwired to zero)
     sd x1,    8(sp)     # ra
     # x2 (sp) was saved manually (at 16) in .from_user
     sd x3,   24(sp)     # gp
@@ -79,23 +73,10 @@ s_trap_vector:
     # Pass trap_frame_t* in a0
     mv a0, sp
 
-    # Decide handler
-    #csrr t0, sstatus
-    #andi t0, t0, (1 << 8)   # Check SPP again
-    #beqz t0, .call_user_handler
-    #j .call_kernel_handler
+    call trap_handler
 
-#.call_user_handler:
-    call s_trap_handler #_user
-#    j .restore_regs
-
-#.call_kernel_handler:
-#    call s_trap_handler #_kernel
-#    j .restore_regs
-
-# ------------------------------
-#.restore_regs:
-    # sd x0     0(sp)     # x0 (hardwired zero)
+    # Restore registers
+    # sd x0     0(sp)   # x0 (hardwired to zero)
     ld x1,    8(sp)     # ra
     # x2 (sp) handle separately
     ld x3,   24(sp)     # gp
@@ -145,4 +126,25 @@ s_trap_vector:
 
 .restore_kernel_stack:
     addi sp, sp, 288
+    sret
+
+
+.global idle_trap_vector
+idle_trap_vector:
+    # Minimal context save
+    #addi sp, sp, -16
+    #sd ra, 0(sp)
+
+    csrr a0, scause
+    csrr a1, sepc
+    csrr a2, sstatus
+    csrr a3, stval
+
+    call trap_handler
+
+    #ld ra, 0(sp)
+    #addi sp, sp, 16
+
+    csrw sepc, a1
+    csrw sstatus, a2
     sret

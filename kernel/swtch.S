@@ -17,13 +17,13 @@ swtch:
     sd s10, 96(a0)
     sd s11, 104(a0)
 
-    srli    t0, a2, 12             # convert to physical PPN (assuming identity mapping)
-    li      t1, 8
-    slli    t1, t1, 60             # t1 = SATP_MODE_SV39 (8 << 60)
-    or      t0, t0, t1             # t0 = final satp value
-    sfence.vma zero, zero          # flush TLB
-    csrw    satp, t0               # load satp
-    sfence.vma zero, zero          # flush TLB
+    #srli    t0, a2, 12             # convert to physical PPN (assuming identity mapping)
+    #li      t1, 8
+    #slli    t1, t1, 60             # t1 = SATP_MODE_SV39 (8 << 60)
+    #or      t0, t0, t1             # t0 = final satp value
+    #sfence.vma zero, zero          # flush TLB
+    #csrw    satp, t0               # load satp
+    #sfence.vma zero, zero          # flush TLB
 
     # Load ra, sp, s0-s11 from new
     ld ra, 0(a1)

@@ -3,9 +3,10 @@
 #include "uart.h"
 #include "list.h"
 #include "mm/mem.h"
+#include "trap/trap.h"
 
 // Forward declaration
-void swtch(context_t *old, context_t *new, pte_t *pagetable);
+void swtch(context_t *old, context_t *new);
 
 void
 schedule()
@@ -42,13 +43,17 @@ schedule()
         }
         c->proc = new;
 
+        // Set normal trap vector
+        write_csr(stvec, trap_vector);
+
         // Load page table for new process
         load_pagetable(c->proc->pagetable);
 
         // Save trap frame
         write_csr(sscratch, c->proc->tf);
 
-        swtch(&old->ctx, &c->proc->ctx, c->proc->pagetable);
+        // Kernel context switch
+        swtch(&old->ctx, &c->proc->ctx);
     } else if (!old->is_idle) {
         // No runnable process, run idle
         DEBUG_PRINT(
@@ -56,8 +61,12 @@ schedule()
             uart_puts(" switching to idle\n");
         );
 
+        // Idle process always stays the same
         c->proc = &idle_procs[c->id];
+        c->proc->ctx.ra = (ulong)idle_loop;
+        c->proc->ctx.sp = (ulong)(c->proc->kstack + KSTACK_SIZE);
 
-        swtch(&old->ctx, &c->proc->ctx, kernel_pagetable);
+        load_pagetable(kernel_pagetable);
+        swtch(&old->ctx, &c->proc->ctx);
     }
 }

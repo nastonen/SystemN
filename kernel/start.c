@@ -197,7 +197,7 @@ start()
     write_csr(pmpcfg0, 0x0f);   // R/W/X permissions, TOR mode
 
     // Set S-mode trap vector
-    write_csr(stvec, s_trap_vector);
+    write_csr(stvec, trap_vector);
 
     // Set up mstatus to enter S-mode
     clear_csr(mstatus, MSTATUS_MPP_MASK);  // Clear MPP (bits 12-11)

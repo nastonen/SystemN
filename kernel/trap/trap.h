@@ -12,6 +12,6 @@
 #define SCAUSE_USER_ECALL        8  // U-mode system call
 #define SCAUSE_SUPERVISOR_ECALL  9  // S-mode system call
 
-void s_trap_handler(trap_frame_t *tf);
-void s_trap_vector();   // ASM entry point
-void restore_and_sret(trap_frame_t *tf);
+void trap_handler(trap_frame_t *tf);
+void trap_vector();                 // asm entry point
+void idle_trap_vector();            // idle entry point
