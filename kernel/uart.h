@@ -11,6 +11,7 @@ extern spinlock_t uart_lock;
 
 void uart_putc(char c);
 void uart_puts(const char* s);
+ulong uart_putsn(const char* s, ulong len);
 void uart_puthex(ulong x);
 void uart_putlong(ulong val);
 

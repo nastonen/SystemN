@@ -2,19 +2,22 @@
 
 #define INPUT_BUF_SIZE 128
 
+int
+streq(const char *s1, const char *s2, int n)
+{
+    for (int i = 0; i < n; i++)
+        if (!s1[i] || !s2[i] || s1[i] != s2[i])
+            return 0;
+
+    return 1;
+}
+
 __attribute__((section(".text.user_shell_main"), used))
 void
 user_shell_main()
 {
     char buf[INPUT_BUF_SIZE] = "$ ";
-
-    /*
-    volatile char *uart = (char *)0x10000000;
-    char msg[] = {'H', '\n', 0};
-    for (int i = 0; msg[i] != 0; i++) {
-        uart[0] = msg[i];
-    }
-    */
+    const char cmd_yield[] = "yield";
 
     while (1) {
         // Print prompt
@@ -28,10 +31,13 @@ user_shell_main()
 
         sleep(1000);
 
-        // Echo back
-        write(buf, n);
+        if (streq(&buf[2], cmd_yield, sizeof(cmd_yield) - 1))
+            yield();
 
-        yield();
+        // Echo back
+        write(buf, n + 2);  // \0 and \n
+
+        //yield();
         //exit();
     }
 }

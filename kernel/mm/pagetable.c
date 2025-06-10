@@ -77,7 +77,7 @@ map_page(pte_t *pagetable, ulong va, ulong pa, int perm)
 pte_t *
 alloc_pagetable(void)
 {
-    uart_puts("alloc_pagetable()\n");
+    //uart_puts("alloc_pagetable()\n");
 
     pte_t *pt = (pte_t *)alloc_page();
     if (pt)

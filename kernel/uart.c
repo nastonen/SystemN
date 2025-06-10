@@ -15,6 +15,18 @@ uart_puts(const char *s)
         uart_putc(*s++);
 }
 
+ulong
+uart_putsn(const char *s, ulong len)
+{
+    ulong written = 0;
+    while (len-- && *s) {
+        uart_putc(*s++);
+        written++;
+    }
+
+    return written;
+}
+
 void
 uart_puthex(ulong x)
 {

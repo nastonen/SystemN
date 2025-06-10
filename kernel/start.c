@@ -22,7 +22,10 @@ setup_kernel_pagetable()
 {
     memset((void *)kernel_pagetable, 0, PAGE_SIZE);
 
-    uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
+    DEBUG_PRINT(
+        uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
+    );
+
     for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
         if (map_page(kernel_pagetable, pa, pa, PTE_R | PTE_W | PTE_X) == -1) {
             uart_puts("map_page() failed for kernel, halting...\n");

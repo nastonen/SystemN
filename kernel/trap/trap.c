@@ -30,9 +30,10 @@ syscall_handler(proc_t *p)
             break;
         }
 
-        DEBUG_PRINT(uart_puts(buf););
+        spin_lock(&uart_lock);
+        p->tf->regs[10] = uart_putsn(buf, len);      // return number of bytes written
+        spin_unlock(&uart_lock);
 
-        p->tf->regs[10] = len;                      // return number of bytes written
         break;
     case SYS_read:
         DEBUG_PRINT(uart_puts("SYS_read\n"););
