@@ -21,10 +21,13 @@ get_page_struct(void *addr)
 {
     ulong idx = page_idx(addr);
     if (idx >= NUM_PAGES) {
+        spin_lock(&uart_lock);
         uart_puts("get_page_struct: INVALID ADDR ");
         uart_puthex((ulong)addr);
         uart_putc('\n');
-        while (1) asm volatile("wfi");
+        spin_unlock(&uart_lock);
+        while (1)
+            asm volatile("wfi");
     }
     return &page_array[idx];
 
@@ -35,10 +38,13 @@ static inline void *
 page_addr(ulong idx)
 {
     if (idx >= NUM_PAGES) {
+        spin_lock(&uart_lock);
         uart_puts("page_addr: INVALID IDX ");
         uart_putlong(idx);
         uart_putc('\n');
-        while (1) asm volatile("wfi");
+        spin_unlock(&uart_lock);
+        while (1)
+            asm volatile("wfi");
     }
     return (void *)(BUDDY_BASE_PHYS + idx * PAGE_SIZE);
 }
@@ -67,39 +73,20 @@ buddy_allocator_init()
 
     while (curr + PAGE_SIZE <= end) {
         int order = MAX_ORDER;
-        // If not enough space in this order or not aligned to power-of-two,
-        // reduce order
+
+        // If not enough space in this order or not aligned
+        // to power-of-two, reduce order
         while (order > 0 &&
                (curr + (PAGE_SIZE << order) > end ||
                curr & ((PAGE_SIZE << order) - 1))) {
             order--;
         }
 
-        // Align curr up if needed
-        /*
-        if (curr & ((PAGE_SIZE << order) - 1)) {
-            curr = (curr + (PAGE_SIZE << order) - 1) & ~((PAGE_SIZE << order) - 1);
-            continue;
-        }
-        uart_putlong(order);
-        uart_putc('\n');
-        */
-
         page_t *pg = get_page_struct((void *)curr);
         pg->order = order;
         pg->is_free = true;
         pg->next = free_lists[order];
         free_lists[order] = pg;
-
-        /*
-        DEBUG_PRINT(
-            uart_puts("Inserting page at: ");
-            uart_puthex(curr);
-            uart_puts(" order=");
-            uart_putlong(order);
-            uart_putc('\n');
-        );
-        */
 
         curr += PAGE_SIZE << order;
     }
@@ -123,18 +110,8 @@ alloc_pages(int order)
     spin_lock(&buddy_lock);
 
     for (int o = order; o <= MAX_ORDER; o++) {
-        if (!free_lists[o]) {
-            //uart_puts("!free_lists[");
-            //uart_putlong(o);
-            //uart_puts("]\n");
+        if (!free_lists[o])
             continue;
-        }
-
-        /*
-        uart_puts("allocating from order: ");
-        uart_putlong(o);
-        uart_putc('\n');
-        */
 
         // Pop from freelist
         page_t *block = free_lists[o];
@@ -144,16 +121,13 @@ alloc_pages(int order)
 
         // Split higher orders
         int block_idx = block - page_array;
-        //int block_idx = page_idx(page_addr(page_idx(block)));
-        for (int curr = o; curr > order; curr--) {
-            //ulong buddy_addr = (ulong)page_addr(page_idx(block)) + (PAGE_SIZE << (curr - 1));
-            //page_t *buddy = get_page_struct((void *)buddy_addr);
-            //int buddy_idx = page_idx(page_addr(page_idx(block))) + (1 << (curr - 1));
 
+        for (int curr = o; curr > order; curr--) {
             uint buddy_idx = block_idx + (1 << (curr - 1));
             if (buddy_idx >= NUM_PAGES) {
                 uart_puts("ERROR: buddy_idx out of bounds\n");
-                while (1) asm volatile("wfi");
+                while (1)
+                    asm volatile("wfi");
             }
 
             page_t *buddy = &page_array[buddy_idx];
@@ -164,14 +138,16 @@ alloc_pages(int order)
         }
 
         // Set final order
-        block->order = order;
+        //block->order = order;
 
-        // Get the address and zero it out
+        // Get the address
         void *addr = page_addr(block_idx);
-        memset(addr, 0, PAGE_SIZE << order);
 
         // Unlock spinlock
         spin_unlock(&buddy_lock);
+
+        // Zero the memory
+        memset(addr, 0, PAGE_SIZE << order);
 
         return addr;
     }
@@ -179,7 +155,7 @@ alloc_pages(int order)
     // Unlock spinlock
     spin_unlock(&buddy_lock);
 
-    uart_puts("returning null\n");
+    //uart_puts("returning null\n");
 
     return NULL;
 }
@@ -197,6 +173,17 @@ free_pages(void *addr)
     spin_lock(&buddy_lock);
 
     page_t *pg = get_page_struct(addr);
+
+    if (pg->is_free) {
+        spin_lock(&uart_lock);
+        uart_puts("Double free detected at: ");
+        uart_puthex((ulong)addr);
+        uart_putc('\n');
+        spin_unlock(&uart_lock);
+        while (1)
+            asm volatile("wfi");
+    }
+
     int order = pg->order;
     pg->is_free = true;
 
