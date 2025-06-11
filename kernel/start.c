@@ -157,7 +157,7 @@ start()
         // Initialize global kernel memory allocator
         if (buddy_allocator_init()) {
             DEBUG_PRINT(
-                uart_puts("Kernel grew too big (over 4MB)! Abort!\n");
+                uart_puts("Kernel grew too big (over 500KB)! Abort!\n");
             );
             while (1)
                 asm volatile("wfi");

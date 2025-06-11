@@ -175,6 +175,8 @@ free_proc(proc_t *p)
     if (p->pagetable)
         free_pagetable(p->pagetable);
 
+    // TODO: properly free user binary and stack
+
     // Free kernel stack
     if (p->kstack)
         kfree(p->kstack);
