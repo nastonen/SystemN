@@ -2,7 +2,8 @@
 
 #include "spinlock.h"
 
-#define UART0               0x10000000L
+#define UART0               0x10000000
+#define UART0_VA            0xC1000000
 #define UART_RHR            0           // Receive Holding Register (read only)
 #define UART_LSR            5           // Line Status Register
 #define UART_LSR_RX_READY   (1 << 0)    // Bit 0: Receiver data ready

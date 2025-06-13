@@ -14,7 +14,7 @@ vpn_level(ulong va, int level)
  *   | 9 bits | 9 bits | 9 bits | 12 bits |
  *   |  VPN2  |  VPN1  |  VPN0  |  Offset |
  *
- * Levels:   L2      →     L1      →     L0
+ * Levels:   L2     ->    L1    ->    L0
  *           pagetable
  */
 pte_t *

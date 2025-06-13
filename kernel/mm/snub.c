@@ -79,9 +79,9 @@ void
 kfree(void *ptr)
 {
     ulong addr = (ulong)ptr;
-    ulong offset = addr - BUDDY_BASE_PHYS;
+    ulong offset = addr - buddy_base_phys;
     int page_idx = offset / PAGE_SIZE;
-    ulong page_base = BUDDY_BASE_PHYS + (page_idx * PAGE_SIZE);
+    ulong page_base = buddy_base_phys + (page_idx * PAGE_SIZE);
     ulong diff = addr - page_base;
 
     // Guess object size by nearest size class

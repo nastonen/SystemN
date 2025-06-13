@@ -20,14 +20,16 @@ extern char _binary_shell_bin_end[];
 void
 setup_kernel_pagetable()
 {
-    memset((void *)kernel_pagetable, 0, PAGE_SIZE);
+    //memset((void *)kernel_pagetable, 0, PAGE_SIZE);
 
     DEBUG_PRINT(
         uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
     );
 
     for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
-        if (map_page(kernel_pagetable, pa, pa, PTE_R | PTE_W | PTE_X) == -1) {
+        // Map kernel to high virtual memory
+        ulong va = KERNEL_START_VA + (pa - KERNEL_START);
+        if (map_page(kernel_pagetable, va, pa, PTE_R | PTE_W | PTE_X) == -1) {
             uart_puts("map_page() failed for kernel, halting...\n");
             while (1)
                 asm volatile("wfi");
@@ -35,7 +37,7 @@ setup_kernel_pagetable()
     }
 
     // Map UART
-    if (map_page(kernel_pagetable, UART0, UART0, PTE_R | PTE_W) == -1) {
+    if (map_page(kernel_pagetable, UART0_VA, UART0, PTE_R | PTE_W) == -1) {
         uart_puts("map_page() failed for UART, halting...\n");
         while (1)
             asm volatile("wfi");
@@ -149,19 +151,13 @@ start()
     c->id = hart_id;
 
     // Halt all harts except 0
-    //if (hart_id != 0)
-      //  while (1)
-        //    asm volatile("wfi");
+    if (hart_id != 0)
+        while (1)
+            asm volatile("wfi");
 
     if (c->id == 0) {
-        // Initialize global kernel memory allocator
-        if (buddy_allocator_init()) {
-            DEBUG_PRINT(
-                uart_puts("Kernel grew too big (over 500KB)! Abort!\n");
-            );
-            while (1)
-                asm volatile("wfi");
-        }
+        // Initialize global memory allocator
+        buddy_allocator_init();
 
         // Map phys mem to virt in kernel
         setup_kernel_pagetable();
@@ -169,8 +165,12 @@ start()
         // Use kernel page table
         load_pagetable(kernel_pagetable);
 
+        uart_puts("snub init...\n");
+
         // SystemN Unified Buddy allocator :)
         snub_init();
+
+        uart_puts("...done\n");
 
         __sync_synchronize();
         allocator_ready = 1;
