@@ -7,11 +7,8 @@ static spinlock_t buddy_lock = SPINLOCK_INIT;
 static ulong num_pages;
 static page_t *page_array;
 static page_t *free_lists[MAX_ORDER + 1];
-
 ulong buddy_base_phys;
-
-__attribute__((aligned(PAGE_SIZE)))
-pte_t kernel_pagetable[PAGE_ENTRIES];
+pte_t *kernel_pagetable; //[PAGE_ENTRIES];
 
 page_t *
 get_page_struct(void *pa)
@@ -56,6 +53,12 @@ buddy_of(void *addr, int order)
 void *
 early_alloc(ulong size)
 {
+    // Align size
+    size = ALIGN_UP(size);
+
+    if (!buddy_base_phys)
+        buddy_base_phys = ALIGN_UP((ulong)_kernel_end);
+
     void *addr = (void *)buddy_base_phys;
     buddy_base_phys += size;
     return addr;
@@ -68,7 +71,9 @@ buddy_allocator_init()
         uart_puts("Initializing buddy allocator...\n");
     );
 
-    buddy_base_phys = ALIGN_UP((ulong)_kernel_end);
+    // Allocate kernel pagetable
+    kernel_pagetable = early_alloc(PAGE_SIZE);
+    memset((void *)kernel_pagetable, 0, PAGE_SIZE);
 
     // Calculate memory range
     ulong phys_start = buddy_base_phys;

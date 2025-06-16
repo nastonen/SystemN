@@ -28,7 +28,6 @@ kmalloc(ulong size)
     int idx = size_to_idx(size);
     if (idx < 0 || idx >= SNUB_NUM_CLASSES)
         return NULL;
-        //return alloc_page();  // Fallback single page
 
     snub_cache_t *cache = &caches[idx];
 

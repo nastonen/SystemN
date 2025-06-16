@@ -13,39 +13,8 @@
 
 volatile int allocator_ready = 0;
 
-extern char _kernel_end[];
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
-
-void
-setup_kernel_pagetable()
-{
-    //memset((void *)kernel_pagetable, 0, PAGE_SIZE);
-
-    DEBUG_PRINT(
-        uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
-    );
-
-    for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
-        // Map kernel to high virtual memory
-        ulong va = KERNEL_START_VA + (pa - KERNEL_START);
-        if (map_page(kernel_pagetable, va, pa, PTE_R | PTE_W | PTE_X) == -1) {
-            uart_puts("map_page() failed for kernel, halting...\n");
-            while (1)
-                asm volatile("wfi");
-        }
-    }
-
-    // Map UART
-    if (map_page(kernel_pagetable, UART0_VA, UART0, PTE_R | PTE_W) == -1) {
-        uart_puts("map_page() failed for UART, halting...\n");
-        while (1)
-            asm volatile("wfi");
-    }
-
-    // Flush TLB
-    asm volatile("sfence.vma zero, zero");
-}
 
 void
 shell_init()
@@ -140,6 +109,46 @@ s_mode_main()
 }
 
 void
+setup_kernel_pagetable()
+{
+    DEBUG_PRINT(
+        uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
+    );
+
+    for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
+        // Map kernel to high virtual memory
+        if (map_page(kernel_pagetable, pa + VA_OFFSET, pa, PTE_R | PTE_W | PTE_X) == -1) {
+            uart_puts("map_page() failed for kernel, halting...\n");
+            while (1)
+                asm volatile("wfi");
+        }
+    }
+
+    // Map UART
+    if (map_page(kernel_pagetable, UART0 + VA_OFFSET, UART0, PTE_R | PTE_W) == -1) {
+        uart_puts("map_page() failed for UART, halting...\n");
+        while (1)
+            asm volatile("wfi");
+    }
+}
+
+void
+mm_init()
+{
+    // Initialize global memory allocator
+    buddy_allocator_init();
+
+    // Map phys mem to virt in kernel
+    setup_kernel_pagetable();
+
+    // Use kernel page table
+    load_pagetable(kernel_pagetable);
+
+    // SystemN Unified Buddy allocator :)
+    snub_init();
+}
+
+void
 start()
 {
     // Set struct cpu to tp register
@@ -155,33 +164,18 @@ start()
         while (1)
             asm volatile("wfi");
 
+    // Initialize memory system
     if (c->id == 0) {
-        // Initialize global memory allocator
-        buddy_allocator_init();
-
-        // Map phys mem to virt in kernel
-        setup_kernel_pagetable();
-
-        // Use kernel page table
-        load_pagetable(kernel_pagetable);
-
-        uart_puts("snub init...\n");
-
-        // SystemN Unified Buddy allocator :)
-        snub_init();
-
-        uart_puts("...done\n");
-
+        mm_init();
         __sync_synchronize();
         allocator_ready = 1;
     } else {
-        // Wait for hart 0 to finish allocator init
+        // Wait for hart 0 to finish memory init
         while (!allocator_ready)
             asm volatile("nop");
 
+        // Use kernel page table on all cores
         __sync_synchronize();
-
-        // Use kernel page table
         load_pagetable(kernel_pagetable);
     }
 
@@ -194,9 +188,7 @@ start()
     write_csr(mideleg, 0xffff);
 
     // Setup PMP to give S-mode access to all memory
-    //ulong onlyUserMem = (0x84000000 >> 2) | ((1 << (26 - 2)) - 1); // NAPOT for 64 MiB
-    ulong allMem = -1L; // Top of memory range (all memory)
-    write_csr(pmpaddr0, allMem); //onlyUserMem);
+    write_csr(pmpaddr0, -1L);
     write_csr(pmpcfg0, 0x0f);   // R/W/X permissions, TOR mode
 
     // Set S-mode trap vector
@@ -209,8 +201,8 @@ start()
     // Enable interrupts in S-mode
     set_csr(sstatus, SSTATUS_SIE);
 
-    // Enable external interrupts
-    //set_csr(sie, (1L << 9));
+    // Supervisor External Interrupt Enable
+    //set_csr(sie, SIE_SEIE);
 
     // Init timer interrupts
     set_csr(sie, SIE_STIE);
@@ -218,11 +210,14 @@ start()
     set_csr(mcounteren, MCOUNTEREN_TIME);
     timer_init();
 
-    // Disable paging for now
-    //write_csr(satp, 0);
+    uart_puts("s_mode_main @ ");
+    uart_puthex((ulong)s_mode_main);
+    uart_putc('\n');
 
     // Set mepc to the address of S-mode entry point
     write_csr(mepc, (ulong)s_mode_main);
+
+    uart_puts("jumping to s-mode!\n");
 
     // Drop to S-mode!
     asm volatile("mret");

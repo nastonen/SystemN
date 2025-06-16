@@ -27,7 +27,7 @@ endif
 
 LDFLAGS = -T $(LINKER)
 
-all: $(TARGET).bin
+#all: $(TARGET).bin
 
 # Compile .c and .S files
 %.o: %.c
@@ -41,15 +41,15 @@ $(TARGET).elf: $(OBJS) $(LINKER)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
 
 # Convert to raw binary
-$(TARGET).bin: $(TARGET).elf
-	$(OBJCOPY) -O binary $< $@
+#$(TARGET).bin: $(TARGET).elf
+#	$(OBJCOPY) -O binary $< $@
 
 # Disassemble (optional)
 dump: $(TARGET).elf
 	$(OBJDUMP) -D $(TARGET).elf > $(TARGET).asm
 
 # Run in QEMU
-run: $(TARGET).bin
+run: $(TARGET).elf
 	qemu-system-riscv64 -machine virt \
                         -smp 4 \
                         -bios none \
@@ -58,7 +58,7 @@ run: $(TARGET).bin
                         -monitor none \
                         -serial stdio \
                         -display none \
-                        -kernel $(TARGET).bin
+                        -kernel $(TARGET).elf
 #                        -S -gdb tcp::1234
 
 clean:

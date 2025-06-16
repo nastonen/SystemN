@@ -2,17 +2,22 @@ ENTRY(_entry)
 
 SECTIONS
 {
-    . = 0x80000000;  /* Starting address of the kernel */
+    . = 0xffffffff80000000;  /* Starting address of the kernel */
 
-    .text : {
+    .text : AT(0x80000000) {
+        _kernel_start = .;
         *(.text)  /* All code goes here */
     }
 
-    .data : {
+    .rodata : ALIGN(16) {
+        *(.rodata)  /* Read-only data goes here */
+    }
+
+    .data : ALIGN(16) {
         *(.data)  /* All initialized data goes here */
     }
 
-    .bss : {
+    .bss : ALIGN(16) {
         *(.bss)  /* All uninitialized data goes here */
     }
 

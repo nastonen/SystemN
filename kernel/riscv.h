@@ -9,6 +9,8 @@
 #define SSTATUS_SUM         (1UL << 18)
 
 #define SIE_STIE            (1UL << 5)
+#define SIE_SEIE            (1UL << 9)
+
 #define MENVCFG_FDT         (1UL << 63)
 #define MCOUNTEREN_TIME     (1UL << 1)
 #define MSTATUS_MPP_MASK    (3UL << 11)  // Mask for MPP (bits 11-12)

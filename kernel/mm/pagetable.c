@@ -36,17 +36,13 @@ walk(pte_t *pagetable, ulong va, int alloc)
         } else {
             //uart_puts("current level not valid!\n");
             if (!alloc){
-                DEBUG_PRINT(
-                    uart_puts("walk(): access to pagetable failed\n");
-                );
+                DEBUG_PRINT(uart_puts("walk(): access to pagetable failed\n"););
                 return NULL;
             }
 
             void *new_pg = alloc_page();
             if (!new_pg) {
-                DEBUG_PRINT(
-                    uart_puts("alloc_page failed in walk()\n");
-                );
+                DEBUG_PRINT(uart_puts("alloc_page failed in walk()\n"););
                 return NULL;
             }
 
