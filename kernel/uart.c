@@ -1,5 +1,6 @@
 #include "uart.h"
 
+ulong UART0 = 0x10000000;
 spinlock_t uart_lock = SPINLOCK_INIT;
 
 void

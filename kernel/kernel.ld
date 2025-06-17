@@ -6,19 +6,19 @@ SECTIONS
 
     .text : AT(0x80000000) {
         _kernel_start = .;
-        *(.text)  /* All code goes here */
+        *(.text .text.*)  /* All code goes here */
     }
 
     .rodata : ALIGN(16) {
-        *(.rodata)  /* Read-only data goes here */
+        *(.rodata .rodata.*)  /* Read-only data goes here */
     }
 
     .data : ALIGN(16) {
-        *(.data)  /* All initialized data goes here */
+        *(.data .data.*)  /* All initialized data goes here */
     }
 
     .bss : ALIGN(16) {
-        *(.bss)  /* All uninitialized data goes here */
+        *(.bss .bss.*)  /* All uninitialized data goes here */
     }
 
     /* Define symbol _kernel_end at current location */

@@ -59,6 +59,7 @@ run: $(TARGET).elf
                         -serial stdio \
                         -display none \
                         -kernel $(TARGET).elf
+#                        -d int,cpu -D log.txt
 #                        -S -gdb tcp::1234
 
 clean:

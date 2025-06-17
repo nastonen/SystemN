@@ -92,6 +92,10 @@ s_mode_main()
         uart_puts(": Hello from S-mode!\n");
     );
 
+    // Create per-CPU process queues
+    LIST_HEAD_INIT(&cpus[curr_cpu()->id].run_queue);
+    LIST_HEAD_INIT(&cpus[curr_cpu()->id].sleep_queue);
+
     // Create idle process for each CPU
     setup_idle_proc();
 
@@ -179,10 +183,6 @@ start()
         load_pagetable(kernel_pagetable);
     }
 
-    // Create per-CPU process queues
-    LIST_HEAD_INIT(&cpus[c->id].run_queue);
-    LIST_HEAD_INIT(&cpus[c->id].sleep_queue);
-
     // Delegate exceptions and interrupts to S-mode
     write_csr(medeleg, 0xffff);
     write_csr(mideleg, 0xffff);
@@ -192,7 +192,7 @@ start()
     write_csr(pmpcfg0, 0x0f);   // R/W/X permissions, TOR mode
 
     // Set S-mode trap vector
-    write_csr(stvec, trap_vector);
+    write_csr(stvec, trap_vector + VA_OFFSET);
 
     // Set up mstatus to enter S-mode
     clear_csr(mstatus, MSTATUS_MPP_MASK);  // Clear MPP (bits 12-11)
@@ -210,14 +210,13 @@ start()
     set_csr(mcounteren, MCOUNTEREN_TIME);
     timer_init();
 
-    uart_puts("s_mode_main @ ");
-    uart_puthex((ulong)s_mode_main);
-    uart_putc('\n');
-
     // Set mepc to the address of S-mode entry point
-    write_csr(mepc, (ulong)s_mode_main);
+    write_csr(mepc, (ulong)s_mode_main + VA_OFFSET);
 
-    uart_puts("jumping to s-mode!\n");
+    // Adjust addrs to virtual for S-mode
+    UART0 += VA_OFFSET;
+    write_tp((ulong)&cpus[hart_id] + VA_OFFSET);
+    asm volatile("add sp, sp, %0" :: "r"(VA_OFFSET));
 
     // Drop to S-mode!
     asm volatile("mret");
