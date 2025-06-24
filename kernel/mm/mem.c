@@ -7,10 +7,11 @@ static spinlock_t buddy_lock = SPINLOCK_INIT;
 static ulong num_pages;
 static page_t *page_array;
 static page_t *free_lists[MAX_ORDER + 1];
+ulong va_offset;
 ulong buddy_base_phys;
-pte_t *kernel_pagetable; //[PAGE_ENTRIES];
+pte_t *kernel_pagetable;
 
-page_t *
+static inline page_t *
 get_page_struct(void *pa)
 {
     ulong idx = ((ulong)pa - buddy_base_phys) / PAGE_SIZE;
@@ -21,7 +22,7 @@ get_page_struct(void *pa)
         while (1)
             asm volatile("wfi");
     }
-    return &page_array[idx];
+    return &page_array[idx]; // + va_offset);
 }
 
 
@@ -37,20 +38,20 @@ page_addr(ulong idx)
         while (1)
             asm volatile("wfi");
     }
-    return (void *)(buddy_base_phys + idx * PAGE_SIZE);
+    return (void *)(buddy_base_phys /*+ va_offset*/ + idx * PAGE_SIZE);
 }
 
-static void *
+static inline void *
 buddy_of(void *addr, int order)
 {
     ulong block = (ulong)addr - buddy_base_phys;
     ulong size = PAGE_SIZE << order;
     ulong buddy = block ^ size;
 
-    return (void *)(buddy + buddy_base_phys);
+    return (void *)(buddy + buddy_base_phys); // + va_offset);
 }
 
-void *
+static inline void *
 early_alloc(ulong size)
 {
     // Align size
@@ -67,9 +68,11 @@ early_alloc(ulong size)
 int
 buddy_allocator_init()
 {
+    /*
     DEBUG_PRINT(
         uart_puts("Initializing buddy allocator...\n");
     );
+    */
 
     // Allocate kernel pagetable
     kernel_pagetable = early_alloc(PAGE_SIZE);
@@ -119,9 +122,11 @@ buddy_allocator_init()
         curr += PAGE_SIZE << order;
     }
 
+    /*
     DEBUG_PRINT(
         uart_puts("Buddy allocator ready.\n");
     );
+    */
 
     return 0;
 }
@@ -147,9 +152,10 @@ alloc_pages(int order)
 
         // Pop from freelist
         page_t *block = free_lists[o];
-        block->order = order;
-        block->is_free = false;
-        free_lists[o] = block->next;
+        page_t *block_va = (page_t *)PHYS_TO_VIRT(free_lists[o]);
+        block_va->order = order;
+        block_va->is_free = false;
+        free_lists[o] = (page_t *)block_va->next;
 
         // Split higher orders
         int block_idx = block - page_array;
@@ -162,11 +168,11 @@ alloc_pages(int order)
                     asm volatile("wfi");
             }
 
-            page_t *buddy = &page_array[buddy_idx];
+            page_t *buddy = (page_t *)PHYS_TO_VIRT(&page_array[buddy_idx]);
             buddy->order = curr - 1;
             buddy->is_free = true;
             buddy->next = free_lists[curr - 1];
-            free_lists[curr - 1] = buddy;
+            free_lists[curr - 1] = (page_t *)VIRT_TO_PHYS(buddy);
         }
 
         // Get the address
@@ -176,15 +182,13 @@ alloc_pages(int order)
         spin_unlock(&buddy_lock);
 
         // Zero the memory
-        memset(addr, 0, PAGE_SIZE << order);
+        memset(PHYS_TO_VIRT(addr), 0, PAGE_SIZE << order);
 
         return addr;
     }
 
     // Unlock spinlock
     spin_unlock(&buddy_lock);
-
-    //uart_puts("returning null\n");
 
     return NULL;
 }
@@ -198,6 +202,9 @@ free_page(void *ptr)
 void
 free_pages(void *addr)
 {
+    if (!addr)
+        return;
+
     // Lock spinlock
     spin_lock(&buddy_lock);
 

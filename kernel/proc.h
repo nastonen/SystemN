@@ -4,13 +4,6 @@
 #include "list.h"
 
 #define NCPU            4  // number of CPUs
-#define KSTACK_SIZE     4096
-
-// Extract physical address from a PTE
-#define PTE2PA(pte)     (((pte) >> 10) << 12)
-
-// Extract permission/flag bits from a PTE
-#define PTE_FLAGS(pte)  ((pte) & 0x3FF)  // bits [9:0]
 
 typedef struct trap_frame {
     ulong regs[32];     // x0 - x31
@@ -65,7 +58,9 @@ curr_cpu()
 
 extern cpu_t cpus[NCPU];
 extern proc_t idle_procs[NCPU];
-extern char idle_stack[NCPU][KSTACK_SIZE];
+
+// TODO: remove this and use boot stacks as idle stacks
+extern char idle_stack[NCPU][4096];
 
 void idle_loop();
 proc_t *create_proc(void *binary, ulong binary_size);

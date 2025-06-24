@@ -28,11 +28,10 @@ walk(pte_t *pagetable, ulong va, int alloc)
             return NULL;
         }
         */
-
         pte_t *pte = &pagetable[idx];
 
         if (*pte & PTE_V) {
-            pagetable = (pte_t *)(((*pte >> 10) << PAGE_SHIFT));
+            pagetable = (pte_t *)PHYS_TO_VIRT(((*pte >> 10) << PAGE_SHIFT));
         } else {
             //uart_puts("current level not valid!\n");
             if (!alloc){
@@ -47,7 +46,7 @@ walk(pte_t *pagetable, ulong va, int alloc)
             }
 
             *pte = ((ulong)new_pg >> PAGE_SHIFT) << 10 | PTE_V;
-            pagetable = (pte_t *)new_pg;
+            pagetable = (pte_t *)PHYS_TO_VIRT(new_pg);
         }
     }
 
@@ -58,14 +57,11 @@ int
 map_page(pte_t *pagetable, ulong va, ulong pa, int perm)
 {
     pte_t *pte = walk(pagetable, va, 1);
-
     if (!pte)
         return -1;
 
-    if (*pte & PTE_V)
-        return -2;  // already mapped
-
-    *pte = ((pa >> PAGE_SHIFT) << 10) | perm | PTE_V | PTE_A | PTE_D;
+    if (!(*pte & PTE_V))
+        *pte = ((pa >> PAGE_SHIFT) << 10) | perm | PTE_V | PTE_A | PTE_D;
 
     return 0;
 }
@@ -73,13 +69,7 @@ map_page(pte_t *pagetable, ulong va, ulong pa, int perm)
 pte_t *
 alloc_pagetable(void)
 {
-    //uart_puts("alloc_pagetable()\n");
-
-    pte_t *pt = (pte_t *)alloc_page();
-    if (pt)
-        memset(pt, 0, PAGE_SIZE);
-
-    return pt;
+    return (pte_t *)PHYS_TO_VIRT(alloc_page());
 }
 
 void

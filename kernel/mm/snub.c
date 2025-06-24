@@ -36,7 +36,7 @@ kmalloc(ulong size)
 
     if (!cache->partial) {
         // Allocate new snub page
-        void *page = alloc_page();
+        void *page = PHYS_TO_VIRT(alloc_page());
         if (!page) {
             // Unlock spinlock
             spin_unlock(&cache->lock);
@@ -101,5 +101,5 @@ kfree(void *ptr)
     }
 
     // Not a known cache — maybe full page allocation
-    free_pages(ptr);
+    free_pages((void *)VIRT_TO_PHYS(ptr));
 }

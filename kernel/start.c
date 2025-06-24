@@ -12,7 +12,6 @@
 #include "mm/pagetable.h"
 
 volatile int allocator_ready = 0;
-
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
 
@@ -62,7 +61,7 @@ void jump_to_user_shell()
     // Set return mode = user
     clear_csr(sstatus, SSTATUS_SPP);
     // Set exception return PC
-    write_csr(sepc, (ulong)USER_START);
+    write_csr(sepc, (ulong)USER_START_VA);
     // Save trap frame
     write_csr(sscratch, (ulong)p->tf);
 
@@ -96,6 +95,9 @@ s_mode_main()
     LIST_HEAD_INIT(&cpus[curr_cpu()->id].run_queue);
     LIST_HEAD_INIT(&cpus[curr_cpu()->id].sleep_queue);
 
+    // Enable timer irqs only after queues are set up
+    timer_init();
+
     // Create idle process for each CPU
     setup_idle_proc();
 
@@ -115,9 +117,11 @@ s_mode_main()
 void
 setup_kernel_pagetable()
 {
+    /*
     DEBUG_PRINT(
         uart_puts("calling map_page() on KERNEL_START - KERNEL_END\n");
     );
+    */
 
     for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
         // Map kernel to high virtual memory
@@ -150,6 +154,10 @@ mm_init()
 
     // SystemN Unified Buddy allocator :)
     snub_init();
+
+    // Adjust addrs to virtual for S-mode
+    va_offset = VA_OFFSET;
+    UART0 += VA_OFFSET;
 }
 
 void
@@ -160,8 +168,7 @@ start()
     write_tp((ulong)&cpus[hart_id]);
 
     // Set hart_id to struct cpu
-    cpu_t *c = curr_cpu();
-    c->id = hart_id;
+    curr_cpu()->id = hart_id;
 
     // Halt all harts except 0
     if (hart_id != 0)
@@ -169,7 +176,7 @@ start()
             asm volatile("wfi");
 
     // Initialize memory system
-    if (c->id == 0) {
+    if (hart_id == 0) {
         mm_init();
         __sync_synchronize();
         allocator_ready = 1;
@@ -208,13 +215,11 @@ start()
     set_csr(sie, SIE_STIE);
     set_csr(menvcfg, MENVCFG_FDT);
     set_csr(mcounteren, MCOUNTEREN_TIME);
-    timer_init();
 
     // Set mepc to the address of S-mode entry point
     write_csr(mepc, (ulong)s_mode_main + VA_OFFSET);
 
-    // Adjust addrs to virtual for S-mode
-    UART0 += VA_OFFSET;
+    // Adjust registers to virtual for S-mode
     write_tp((ulong)&cpus[hart_id] + VA_OFFSET);
     asm volatile("add sp, sp, %0" :: "r"(VA_OFFSET));
 
