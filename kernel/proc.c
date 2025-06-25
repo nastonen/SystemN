@@ -141,8 +141,7 @@ check_va_mapped(pte_t *pagetable, ulong va)
 void
 copy_kernel_mappings(pte_t *dst, pte_t *src)
 {
-    // Copy all mappings from KERNEL_START to KERNEL_END
-    for (ulong va = KERNEL_START_VA; va < (ulong)_kernel_end/*KERNEL_END_VA*/; va += PAGE_SIZE) {
+    for (ulong va = KERNEL_START_VA; va < (ulong)_kernel_end; va += PAGE_SIZE) {
         pte_t *src_pte = walk(src, va, 0);
         if (!src_pte || !(*src_pte & PTE_V)) {
             uart_puts("copy_kernel_mappings: missing PTE at ");

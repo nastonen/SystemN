@@ -61,7 +61,7 @@ void jump_to_user_shell()
     // Set return mode = user
     clear_csr(sstatus, SSTATUS_SPP);
     // Set exception return PC
-    write_csr(sepc, (ulong)USER_START_VA);
+    //write_csr(sepc, (ulong)USER_START_VA);
     // Save trap frame
     write_csr(sscratch, (ulong)p->tf);
 
@@ -171,9 +171,9 @@ start()
     curr_cpu()->id = hart_id;
 
     // Halt all harts except 0
-    if (hart_id != 0)
-        while (1)
-            asm volatile("wfi");
+    //if (hart_id != 0)
+      //  while (1)
+        //    asm volatile("wfi");
 
     // Initialize memory system
     if (hart_id == 0) {

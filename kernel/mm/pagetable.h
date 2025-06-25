@@ -6,7 +6,7 @@
 #define PTE_COUNT    512  // Entries per page table level (9 bits)
 
 #define SATP_MODE_SV39   (8UL << 60)
-#define MAKE_SATP(pgtbl) (SATP_MODE_SV39 | ((VIRT_TO_PHYS(pgtbl) >> 12) & 0xFFFFFFFFFFFUL))
+#define MAKE_SATP(pgtbl) (SATP_MODE_SV39 | (((ulong)pgtbl >> 12) & 0xFFFFFFFFFFFUL))
 
 #define PTE_V (1L << 0)
 #define PTE_R (1L << 1)

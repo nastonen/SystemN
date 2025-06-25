@@ -56,6 +56,9 @@ walk(pte_t *pagetable, ulong va, int alloc)
 int
 map_page(pte_t *pagetable, ulong va, ulong pa, int perm)
 {
+    // Convert to virtual address
+    pagetable = PHYS_TO_VIRT(pagetable);
+
     pte_t *pte = walk(pagetable, va, 1);
     if (!pte)
         return -1;
@@ -69,15 +72,12 @@ map_page(pte_t *pagetable, ulong va, ulong pa, int perm)
 pte_t *
 alloc_pagetable(void)
 {
-    return (pte_t *)PHYS_TO_VIRT(alloc_page());
+    return (pte_t *)alloc_page();
 }
 
 void
 load_pagetable(pte_t *pagetable)
 {
-    // Flush TLB
-    asm volatile ("sfence.vma zero, zero");
-
     write_csr(satp, MAKE_SATP(pagetable));
 
     // Flush TLB
@@ -87,6 +87,9 @@ load_pagetable(pte_t *pagetable)
 void
 free_pagetable(pte_t *pagetable)
 {
+    // Convert to virtual address
+    pagetable = PHYS_TO_VIRT(pagetable);
+
     for (int i = 0; i < PTE_COUNT; i++) {
         pte_t pte = pagetable[i];
         if ((pte & PTE_V) && !(pte & (PTE_R | PTE_W | PTE_X))) {
