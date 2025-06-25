@@ -13,41 +13,45 @@ syscall_handler(proc_t *p)
 {
     cpu_t *c = curr_cpu();
     int syscall_num = p->tf->regs[17];              // a7 (syscall number)
-    int fd;
-    ulong len;
 
     switch (syscall_num) {
     case SYS_write:
         // 'write' syscall: arguments in a0 (fd), a1 (buffer), a2 (size)
         DEBUG_PRINT(uart_puts("SYS_write\n"););
 
-        fd = p->tf->regs[10];                       // a0
-        const char *buf = (char*)p->tf->regs[11];   // a1
-        len = p->tf->regs[12];                      // a2
-
-        if (fd != 1 && fd != 2) {
+        int fdw = p->tf->regs[10];                  // a0
+        if (fdw != 1 && fdw != 2) {
             p->tf->regs[10] = -1;                   // error (unsupported fd)
             break;
         }
 
-        spin_lock(&uart_lock);
-        p->tf->regs[10] = uart_putsn(buf, len);      // return number of bytes written
-        spin_unlock(&uart_lock);
+        uint len = p->tf->regs[12];                 // a2
+        if (len > MAXLEN)
+            len = MAXLEN;
+        char buf[MAXLEN];
+        copy_from_user(buf, (void *)p->tf->regs[11], len);  // a1
 
+        spin_lock(&uart_lock);
+        p->tf->regs[10] = uart_putsn(buf, len);     // return number of bytes written
+        spin_unlock(&uart_lock);
         break;
     case SYS_read:
         DEBUG_PRINT(uart_puts("SYS_read\n"););
 
-        fd = p->tf->regs[10];                       // a0
-        char *buf1 = (char *)p->tf->regs[11];       // a1
-        len = p->tf->regs[12];                      // a2
-
-        if (fd == 0) {                              // stdin
-            DEBUG_PRINT(uart_puts("waiting for uart_gets()...\n"););
-            p->tf->regs[10] = uart_gets(buf1, len); // return number of bytes read
-        } else {
+        int fdr = p->tf->regs[10];                  // a0
+        if (fdr) {
             p->tf->regs[10] = -1;                   // invalid
+            break;
         }
+
+        uint lenr = p->tf->regs[12];                 // a2
+        if (lenr > MAXLEN)
+            lenr = MAXLEN;
+        char bufr[MAXLEN];
+
+        DEBUG_PRINT(uart_puts("waiting for uart_gets()...\n"););
+        p->tf->regs[10] = uart_gets(bufr, lenr);     // return number of bytes read
+        copy_to_user((void *)p->tf->regs[11], bufr, lenr);
         break;
     case SYS_exit:
         DEBUG_PRINT(uart_puts("SYS_exit\n"););

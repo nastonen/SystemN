@@ -56,21 +56,18 @@ void jump_to_user_shell()
     proc_t *p = curr_cpu()->proc;
 
     // Setup SSTATUS: SPIE=1 (enable interrupts)
-    //                SUM=1 (protect U-memory from S-mode)
-    write_csr(sstatus, SSTATUS_SPIE | SSTATUS_SUM);
+    write_csr(sstatus, SSTATUS_SPIE);
     // Set return mode = user
     clear_csr(sstatus, SSTATUS_SPP);
-    // Set exception return PC
-    //write_csr(sepc, (ulong)USER_START_VA);
     // Save trap frame
     write_csr(sscratch, (ulong)p->tf);
 
     load_pagetable(p->pagetable);
 
-    // Set up user registers (only sp is required here)
+    // Set up sp (toggle SUM to touch user memory)
+    set_csr(sstatus, SSTATUS_SUM);
     register ulong sp asm("sp") = (ulong)USER_STACK_TOP;
-
-    //clear_csr(sstatus, SSTATUS_SUM);
+    clear_csr(sstatus, SSTATUS_SUM);
 
     asm volatile(
         "mv sp, %0\n"
