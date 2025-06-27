@@ -15,17 +15,12 @@
 #define USER_START_VA       0x0
 #define USER_END_VA         0x7800000                                       // 120MB for user space
 
-
-#define KSTACK_SIZE         PAGE_SIZE
-#define KSTACK_BASE_VA      0xffffffc000000000                              // Process kernel stacks live here
-#define PER_PROC_KSTACK_VA(pid) (KSTACK_BASE_VA + ((pid) * KSTACK_SIZE))
-
-
 #define VA_OFFSET           (KERNEL_START_VA - KERNEL_START)
 
 #define PHYS_TO_VIRT(pa)    ((void *)((ulong)(pa) + va_offset))
 #define VIRT_TO_PHYS(va)    ((ulong)(va) - va_offset)
 
+#define KSTACK_SIZE         PAGE_SIZE
 #define USER_STACK_SIZE     PAGE_SIZE
 #define USER_STACK_TOP      USER_END_VA
 #define USER_STACK_BASE     (USER_END_VA - USER_STACK_SIZE)

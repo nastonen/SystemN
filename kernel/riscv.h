@@ -59,19 +59,3 @@ write_tp(ulong val)
 {
     asm volatile("mv tp, %0" :: "r"(val));
 }
-
-static inline void
-copy_from_user(void *kernel_dst, const void *user_src, uint len)
-{
-    set_csr(sstatus, SSTATUS_SUM);
-    __builtin_memcpy(kernel_dst, user_src, len);
-    clear_csr(sstatus, SSTATUS_SUM);
-}
-
-static inline void
-copy_to_user(void *user_dst, const void *kernel_src, uint len)
-{
-    set_csr(sstatus, SSTATUS_SUM);
-    __builtin_memcpy(user_dst, kernel_src, len);
-    clear_csr(sstatus, SSTATUS_SUM);
-}

@@ -54,21 +54,6 @@ dump_mappings(pte_t *pagetable, ulong start_va, ulong end_va)
 }
 
 void
-dump_pagetable(pte_t *pagetable)
-{
-    uart_puts("Page table dump:\n");
-    for (int i = 0; i < 512; i++) {
-        if (pagetable[i] & PTE_V) {
-            uart_puts("Entry ");
-            uart_puthex(i);
-            uart_puts(": ");
-            uart_puthex(pagetable[i]);
-            uart_putc('\n');
-        }
-    }
-}
-
-void
 dump_pagetable_recursive(pte_t *pagetable, int level, ulong va_base)
 {
     for (int i = 0; i < 512; i++) {
@@ -101,40 +86,6 @@ dump_pagetable_recursive(pte_t *pagetable, int level, ulong va_base)
                 dump_pagetable_recursive(next, level - 1, va);
             }
         }
-    }
-}
-
-void
-dump_pagetable_range(pte_t *pagetable, ulong va_start, ulong va_end)
-{
-    for (ulong va = va_start; va < va_end; va += PAGE_SIZE) {
-        pte_t *pte = walk(pagetable, va, 0);
-        if (pte && (*pte & PTE_V)) {
-            uart_puts("VA ");
-            uart_puthex(va);
-            uart_puts(" -> PA ");
-            uart_puthex(PTE2PA(*pte));
-            uart_puts(" Flags: ");
-            uart_puthex(PTE_FLAGS(*pte));
-            uart_putc('\n');
-        }
-    }
-}
-
-void
-check_va_mapped(pte_t *pagetable, ulong va)
-{
-    pte_t *pte = walk(pagetable, va, 0);  // '0' means don't allocate
-    if (pte && (*pte & PTE_V)) {
-        uart_puts("VA ");
-        uart_puthex(va);
-        uart_puts(" is mapped to PA ");
-        uart_puthex(PTE2PA(*pte));
-        uart_putc('\n');
-    } else {
-        uart_puts("VA ");
-        uart_puthex(va);
-        uart_puts(" is NOT mapped!\n");
     }
 }
 
@@ -286,7 +237,7 @@ create_proc(void *binary, ulong binary_size)
     );
     */
 
-    //dump_mappings(p->pagetable, USER_STACK_TOP - PAGE_SIZE, USER_STACK_TOP);
+    //dump_mappings(p->pagetable, USER_STACK_TOP - USER_STACK_SIZE, USER_STACK_TOP);
     //dump_mappings(p->pagetable, KERNEL_START_VA, (ulong)_kernel_end);
     //dump_mappings(p->pagetable, UART0, UART0 + PAGE_SIZE);
 

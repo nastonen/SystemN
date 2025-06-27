@@ -22,12 +22,6 @@ walk(pte_t *pagetable, ulong va, int alloc)
 {
     for (int level = 2; level > 0; level--) {
         uint idx = vpn_level(va, level);
-        /*
-        if (idx >= PAGE_ENTRIES) {
-            uart_puts("vpn index overflow!\n");
-            return NULL;
-        }
-        */
         pte_t *pte = &pagetable[idx];
 
         if (*pte & PTE_V) {

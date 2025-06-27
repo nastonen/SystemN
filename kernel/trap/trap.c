@@ -7,52 +7,63 @@
 #include "../syscall.h"
 #include "../string.h"
 #include "../sched.h"
+#include "../mm/user_copy.h"
 
 void
 syscall_handler(proc_t *p)
 {
     cpu_t *c = curr_cpu();
-    int syscall_num = p->tf->regs[17];              // a7 (syscall number)
+    int syscall_num = p->tf->regs[17]; // a7 (syscall number)
 
     switch (syscall_num) {
-    case SYS_write:
+    case SYS_write: {
         // 'write' syscall: arguments in a0 (fd), a1 (buffer), a2 (size)
         DEBUG_PRINT(uart_puts("SYS_write\n"););
 
-        int fdw = p->tf->regs[10];                  // a0
-        if (fdw != 1 && fdw != 2) {
-            p->tf->regs[10] = -1;                   // error (unsupported fd)
+        int fd = p->tf->regs[10];
+        if (fd != 1 && fd != 2) {
+            p->tf->regs[10] = -1;
             break;
         }
 
-        uint len = p->tf->regs[12];                 // a2
+        uint len = p->tf->regs[12];
         if (len > MAXLEN)
             len = MAXLEN;
+
         char buf[MAXLEN];
-        copy_from_user(buf, (void *)p->tf->regs[11], len);  // a1
-
-        spin_lock(&uart_lock);
-        p->tf->regs[10] = uart_putsn(buf, len);     // return number of bytes written
-        spin_unlock(&uart_lock);
-        break;
-    case SYS_read:
-        DEBUG_PRINT(uart_puts("SYS_read\n"););
-
-        int fdr = p->tf->regs[10];                  // a0
-        if (fdr) {
-            p->tf->regs[10] = -1;                   // invalid
+        if (copy_from_user(buf, (void *)p->tf->regs[11], len) < 0) {
+            p->tf->regs[10] = -1;
             break;
         }
 
-        uint lenr = p->tf->regs[12];                 // a2
-        if (lenr > MAXLEN)
-            lenr = MAXLEN;
-        char bufr[MAXLEN];
+        spin_lock(&uart_lock);
+        p->tf->regs[10] = uart_putsn(buf, len); // return number of bytes written
+        spin_unlock(&uart_lock);
+        break;
+    }
+    case SYS_read: {
+        DEBUG_PRINT(uart_puts("SYS_read\n"););
+
+        int fd = p->tf->regs[10];
+        if (fd) {
+            p->tf->regs[10] = -1;
+            break;
+        }
+
+        uint len = p->tf->regs[12];
+        if (len > MAXLEN)
+            len = MAXLEN;
 
         DEBUG_PRINT(uart_puts("waiting for uart_gets()...\n"););
-        p->tf->regs[10] = uart_gets(bufr, lenr);     // return number of bytes read
-        copy_to_user((void *)p->tf->regs[11], bufr, lenr);
+
+        char buf[MAXLEN];
+        p->tf->regs[10] = uart_gets(buf, len);
+        if (copy_to_user((void *)p->tf->regs[11], buf, len) < 0) {
+            p->tf->regs[10] = -1;
+            break;
+        }
         break;
+    }
     case SYS_exit:
         DEBUG_PRINT(uart_puts("SYS_exit\n"););
         p->state = ZOMBIE;
@@ -69,9 +80,9 @@ syscall_handler(proc_t *p)
     case SYS_sleep_ms:
         DEBUG_PRINT(uart_puts("SYS_sleep_ms\n"););
 
-        ulong ms = p->tf->regs[10];                 // a0
+        ulong ms = p->tf->regs[10];
         if (ms == 0 || ms > MAX_SLEEP_MS) {
-            p->tf->regs[10] = -1;                   // Return error
+            p->tf->regs[10] = -1;
             break;
         }
         /*
@@ -97,7 +108,7 @@ syscall_handler(proc_t *p)
             uart_puthex(syscall_num);
             uart_putc('\n');
         );
-        p->tf->regs[10] = -1;                       // Return error code
+        p->tf->regs[10] = -1;
         break;
     }
 }
