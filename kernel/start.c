@@ -12,8 +12,15 @@
 #include "mm/pagetable.h"
 
 volatile int allocator_ready = 0;
+
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
+
+extern char _kernel_text_start[];
+extern char _kernel_text_end[];
+extern char _kernel_rodata_start[];
+extern char _kernel_rodata_end[];
+extern char _kernel_data_start[];
 
 void
 shell_init()
@@ -120,21 +127,42 @@ setup_kernel_pagetable()
     );
     */
 
-    for (ulong pa = KERNEL_START; pa < KERNEL_END; pa += PAGE_SIZE) {
-        // Map kernel to high virtual memory
-        if (map_page(kernel_pagetable, pa + VA_OFFSET, pa, PTE_R | PTE_W | PTE_X) == -1) {
-            uart_puts("map_page() failed for kernel, halting...\n");
+    // Map kernel code
+    for (ulong pa = (ulong)_kernel_text_start; pa < (ulong)_kernel_text_end; pa += PAGE_SIZE) {
+        if (map_page(kernel_pagetable, pa + VA_OFFSET, pa, PTE_R | PTE_X) == -1) {
+            uart_puts("map_page() failed for kernel text, halting...\n");
+            while (1)
+                asm volatile("wfi");
+        }
+    }
+
+    // Map rodata
+    for (ulong pa = (ulong)_kernel_rodata_start; pa < (ulong)_kernel_rodata_end; pa += PAGE_SIZE) {
+        if (map_page(kernel_pagetable, pa + VA_OFFSET, pa, PTE_R) == -1) {
+            uart_puts("map_page() failed for kernel rodata, halting...\n");
+            while (1)
+                asm volatile("wfi");
+        }
+    }
+
+    // Map (s)data, (s)bss and heap
+    for (ulong pa = (ulong)_kernel_data_start; pa < (ulong)KERNEL_END; pa += PAGE_SIZE) {
+        if (map_page(kernel_pagetable, pa + VA_OFFSET, pa, PTE_R | PTE_W) == -1) {
+            uart_puts("map_page() failed for kernel data + heap, halting...\n");
             while (1)
                 asm volatile("wfi");
         }
     }
 
     // Map UART
-    if (map_page(kernel_pagetable, UART0 + VA_OFFSET, UART0, PTE_R | PTE_W) == -1) {
+    if (map_page(kernel_pagetable, UART0, UART0 - VA_OFFSET, PTE_R | PTE_W) == -1) {
         uart_puts("map_page() failed for UART, halting...\n");
         while (1)
             asm volatile("wfi");
     }
+
+    // Wait for the changes
+    asm volatile ("sfence.vma zero, zero");
 }
 
 void
@@ -154,7 +182,6 @@ mm_init()
 
     // Adjust addrs to virtual for S-mode
     va_offset = VA_OFFSET;
-    UART0 += VA_OFFSET;
 }
 
 void

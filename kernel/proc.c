@@ -5,11 +5,17 @@
 #include "mm/pagetable.h"
 #include "trap/trap.h"
 
-static long next_pid = 1;
+static long next_pid;
 
 cpu_t cpus[NCPU];
 proc_t idle_procs[NCPU];
 char idle_stack[NCPU][KSTACK_SIZE];
+
+extern char _kernel_text_start[];
+extern char _kernel_text_end[];
+extern char _kernel_rodata_start[];
+extern char _kernel_rodata_end[];
+extern char _kernel_data_start[];
 extern char _kernel_end[];
 
 void
@@ -121,7 +127,7 @@ create_proc(void *binary, ulong binary_size)
     if (!p)
         goto fail;
 
-    p->pid = ATOMIC_FETCH_AND_INC(&next_pid);
+    p->pid = ATOMIC_INC_AND_FETCH(&next_pid);
     p->bound_cpu = -1;
 
     /*
@@ -214,8 +220,6 @@ create_proc(void *binary, ulong binary_size)
 
     // Map kernel segments
     copy_kernel_mappings(p->pagetable, PHYS_TO_VIRT(kernel_pagetable));
-    //for (ulong va = KERNEL_START_VA; va < (ulong)_kernel_end/*KERNEL_END_VA*/; va += PAGE_SIZE)
-        //map_page(p->pagetable, va, va, PTE_R | PTE_W | PTE_X);
 
     /*
     DEBUG_PRINT(

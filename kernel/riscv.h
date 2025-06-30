@@ -46,6 +46,17 @@
     __old_val;                         \
 })
 
+#define ATOMIC_INC_AND_FETCH(ptr) ({        \
+    long __old_val;                         \
+    asm volatile (                          \
+        "li t0, 1\n\t"                      \
+        "amoadd.d.aq %0, t0, (%1)\n\t"      \
+        : "=r"(__old_val)                   \
+        : "r"(ptr)                          \
+        : "t0", "memory");                  \
+    __old_val + 1;                          \
+})
+
 static inline ulong
 read_tp()
 {
