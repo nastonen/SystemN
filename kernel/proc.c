@@ -9,13 +9,6 @@ static long next_pid;
 
 cpu_t cpus[NCPU];
 proc_t idle_procs[NCPU];
-char idle_stack[NCPU][KSTACK_SIZE];
-
-extern char _kernel_text_start[];
-extern char _kernel_text_end[];
-extern char _kernel_rodata_start[];
-extern char _kernel_rodata_end[];
-extern char _kernel_data_start[];
 extern char _kernel_end[];
 
 void

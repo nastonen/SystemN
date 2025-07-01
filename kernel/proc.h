@@ -59,9 +59,6 @@ curr_cpu()
 extern cpu_t cpus[NCPU];
 extern proc_t idle_procs[NCPU];
 
-// TODO: remove this and use boot stacks as idle stacks
-extern char idle_stack[NCPU][4096];
-
 void idle_loop();
 proc_t *create_proc(void *binary, ulong binary_size);
 void free_proc(proc_t *p);

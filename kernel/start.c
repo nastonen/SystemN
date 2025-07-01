@@ -13,6 +13,8 @@
 
 volatile int allocator_ready = 0;
 
+extern char _stack[];
+
 extern char _binary_shell_bin_start[];
 extern char _binary_shell_bin_end[];
 
@@ -46,7 +48,9 @@ setup_idle_proc()
     idle->is_idle = 1;
     idle->state = RUNNING;
     idle->pagetable = kernel_pagetable;
-    idle->kstack = idle_stack[c->id];
+
+    // Reuse boot stack as idle stack
+    idle->kstack = _stack + (c->id * KSTACK_SIZE);
 
     // Set context
     idle->ctx.ra = (ulong)idle_loop;
