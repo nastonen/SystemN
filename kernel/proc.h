@@ -32,12 +32,14 @@ typedef struct proc {
     enum proc_state state;
     int is_idle;
     int bound_cpu;
-    char *kstack;
     ulong sleep_until;
     trap_frame_t *tf;
     context_t ctx;
     list_node_t q_node;
+    //list_node_t user_bin;
     pte_t *pagetable;
+    char *kstack;
+    char *ustack;
 } proc_t;
 
 typedef struct cpu {

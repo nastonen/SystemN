@@ -196,12 +196,12 @@ create_proc(void *binary, ulong binary_size)
     */
 
     // User stack (1 page)
-    ulong stack_pa = (ulong)alloc_page();
-    if (!stack_pa)
+    p->ustack = alloc_page();
+    if (!p->ustack)
         goto fail1;
 
     // Map user stack
-    if (map_page(p->pagetable, USER_STACK_TOP - USER_STACK_SIZE, stack_pa, PTE_R | PTE_W | PTE_U) == -1)
+    if (map_page(p->pagetable, USER_STACK_TOP - USER_STACK_SIZE, (ulong)p->ustack, PTE_R | PTE_W | PTE_U) == -1)
         goto fail1;
 
     /*
@@ -268,15 +268,20 @@ free_proc(proc_t *p)
     if (list_in_queue(&p->q_node))
         list_del(&p->q_node);
 
+    // Free user stack
+    if (p->ustack)
+        free_page(p->ustack);
+
+    // TODO: properly free user binary
+
     // Free user page table
     if (p->pagetable)
         free_pagetable(p->pagetable);
-
-    // TODO: properly free user binary and stack
 
     // Free kernel stack
     if (p->kstack)
         kfree(p->kstack);
 
+    // Free the process
     kfree(p);
 }
