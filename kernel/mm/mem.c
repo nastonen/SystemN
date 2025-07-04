@@ -22,7 +22,7 @@ get_page_struct(void *pa)
         while (1)
             asm volatile("wfi");
     }
-    return &page_array[idx]; // + va_offset);
+    return &page_array[idx];
 }
 
 
@@ -38,7 +38,7 @@ page_addr(ulong idx)
         while (1)
             asm volatile("wfi");
     }
-    return (void *)(buddy_base_phys /*+ va_offset*/ + idx * PAGE_SIZE);
+    return (void *)(buddy_base_phys + idx * PAGE_SIZE);
 }
 
 static inline void *
@@ -48,7 +48,7 @@ buddy_of(void *addr, int order)
     ulong size = PAGE_SIZE << order;
     ulong buddy = block ^ size;
 
-    return (void *)(buddy + buddy_base_phys); // + va_offset);
+    return (void *)(buddy + buddy_base_phys);
 }
 
 static inline void *
@@ -211,6 +211,10 @@ free_pages(void *addr)
     page_t *pg = get_page_struct(addr);
 
     if (pg->is_free) {
+        spin_unlock(&buddy_lock);
+        return;
+
+        /*
         spin_lock(&uart_lock);
         uart_puts("Double free detected at: ");
         uart_puthex((ulong)addr);
@@ -218,6 +222,7 @@ free_pages(void *addr)
         spin_unlock(&uart_lock);
         while (1)
             asm volatile("wfi");
+        */
     }
 
     int order = pg->order;

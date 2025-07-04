@@ -1,6 +1,6 @@
 #pragma once
 
-#include "syscall.h"
+#include "user_syscall.h"
 
 static inline long
 write(const void *buf, unsigned long cnt)
@@ -41,4 +41,27 @@ sleep(unsigned long ms)
         return 0;
 
     return syscall1(SYS_sleep_ms, ms);
+}
+
+static inline long
+sbrk(unsigned long size)
+{
+    return syscall1(SYS_sbrk, size);
+}
+
+static inline long
+munmap(void *addr, unsigned long size)
+{
+    return syscall2(SYS_munmap, (long)addr, size);
+}
+
+// Move to stdlib
+void *
+malloc(unsigned long size)
+{
+    unsigned long mem = sbrk(size);
+    if (mem == -1)
+        return 0; //NULL;
+
+    return (void *)mem;
 }

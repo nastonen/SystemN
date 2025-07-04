@@ -1,5 +1,4 @@
 #include "pagetable.h"
-#include "mem.h"
 #include "../riscv.h"
 #include "../uart.h"
 
@@ -25,7 +24,7 @@ walk(pte_t *pagetable, ulong va, int alloc)
         pte_t *pte = &pagetable[idx];
 
         if (*pte & PTE_V) {
-            pagetable = (pte_t *)PHYS_TO_VIRT(((*pte >> 10) << PAGE_SHIFT));
+            pagetable = (pte_t *)PHYS_TO_VIRT(PTE2PA(*pte));
         } else {
             //uart_puts("current level not valid!\n");
             if (!alloc){
@@ -39,7 +38,7 @@ walk(pte_t *pagetable, ulong va, int alloc)
                 return NULL;
             }
 
-            *pte = ((ulong)new_pg >> PAGE_SHIFT) << 10 | PTE_V;
+            *pte = PA2PTE(new_pg) | PTE_V;
             pagetable = (pte_t *)PHYS_TO_VIRT(new_pg);
         }
     }
@@ -58,10 +57,33 @@ map_page(pte_t *pagetable, ulong va, ulong pa, int perm)
         return -1;
 
     if (!(*pte & PTE_V))
-        *pte = ((pa >> PAGE_SHIFT) << 10) | perm | PTE_V | PTE_A | PTE_D;
+        *pte = PA2PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
 
     return 0;
 }
+
+int
+unmap_page(pte_t *pagetable, ulong va)
+{
+    // Convert to virtual address
+    pagetable = PHYS_TO_VIRT(pagetable);
+
+    pte_t *pte = walk(pagetable, va, 0);
+    if (!pte || !(*pte & PTE_V))
+        return -1;
+
+    ulong pa = PTE2PA(*pte);
+    free_page((void *)pa);
+
+    // Clear the PTE
+    *pte = 0;
+
+    // Flush TLB for this address
+    asm volatile("sfence.vma %0, zero" :: "r"(va) : "memory");
+
+    return 0;
+}
+
 
 pte_t *
 alloc_pagetable(void)
@@ -87,7 +109,7 @@ free_pagetable(pte_t *pagetable)
     for (int i = 0; i < PTE_COUNT; i++) {
         pte_t pte = pagetable[i];
         if ((pte & PTE_V) && !(pte & (PTE_R | PTE_W | PTE_X))) {
-            pte_t *child = (pte_t *)((pte >> 10) << PAGE_SHIFT);
+            pte_t *child = (pte_t *)PTE2PA(pte);
             free_pagetable(child);
         }
     }

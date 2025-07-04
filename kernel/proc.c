@@ -71,7 +71,7 @@ dump_pagetable_recursive(pte_t *pagetable, int level, ulong va_base)
 
             if (pte & (PTE_R | PTE_W | PTE_X)) {
                 // It's a leaf entry, calculate physical address
-                ulong pa = ((pte >> 10) << 12);
+                ulong pa = PTE2PA(pte);
                 uart_puts(" -> PA ");
                 uart_puthex(pa);
             }
@@ -80,7 +80,7 @@ dump_pagetable_recursive(pte_t *pagetable, int level, ulong va_base)
 
             if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) {
                 // This PTE points to a lower-level page table
-                ulong next_pa = ((pte >> 10) << 12);
+                ulong next_pa = PTE2PA(pte);
                 pte_t *next = (pte_t *)PHYS_TO_VIRT(next_pa);
                 dump_pagetable_recursive(next, level - 1, va);
             }
@@ -191,9 +191,13 @@ create_proc(void *binary, ulong binary_size)
     /*
     DEBUG_PRINT(
         uart_puts("User binary loaded\n");
-        uart_puts("Allocating user stack...\n");
+        uart_puts("Allocating user heap and stack...\n");
     );
     */
+
+    // Set user heap
+    p->heap_start = ALIGN_UP(va);
+    p->heap_end = p->heap_start;
 
     // User stack (1 page)
     p->ustack = alloc_page();

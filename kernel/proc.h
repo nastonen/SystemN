@@ -38,6 +38,8 @@ typedef struct proc {
     list_node_t q_node;
     //list_node_t user_bin;
     pte_t *pagetable;
+    ulong heap_start;
+    ulong heap_end;
     char *kstack;
     char *ustack;
 } proc_t;

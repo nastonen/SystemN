@@ -5,9 +5,9 @@
 #include "../proc.h"
 #include "../timer.h"
 #include "../syscall.h"
+#include "../user_syscall.h"
 #include "../string.h"
 #include "../sched.h"
-#include "../mm/user_copy.h"
 
 void
 syscall_handler(proc_t *p)
@@ -17,51 +17,13 @@ syscall_handler(proc_t *p)
 
     switch (syscall_num) {
     case SYS_write: {
-        // 'write' syscall: arguments in a0 (fd), a1 (buffer), a2 (size)
         DEBUG_PRINT(uart_puts("SYS_write\n"););
-
-        int fd = p->tf->regs[10];
-        if (fd != 1 && fd != 2) {
-            p->tf->regs[10] = -1;
-            break;
-        }
-
-        uint len = p->tf->regs[12];
-        if (len > MAXLEN)
-            len = MAXLEN;
-
-        char buf[MAXLEN];
-        if (copy_from_user(buf, (void *)p->tf->regs[11], len) < 0) {
-            p->tf->regs[10] = -1;
-            break;
-        }
-
-        spin_lock(&uart_lock);
-        p->tf->regs[10] = uart_putsn(buf, len); // return number of bytes written
-        spin_unlock(&uart_lock);
+        p->tf->regs[10] = sys_write(p->tf->regs[10], (void *)p->tf->regs[11], p->tf->regs[12]);
         break;
     }
     case SYS_read: {
         DEBUG_PRINT(uart_puts("SYS_read\n"););
-
-        int fd = p->tf->regs[10];
-        if (fd) {
-            p->tf->regs[10] = -1;
-            break;
-        }
-
-        uint len = p->tf->regs[12];
-        if (len > MAXLEN)
-            len = MAXLEN;
-
-        DEBUG_PRINT(uart_puts("waiting for uart_gets()...\n"););
-
-        char buf[MAXLEN];
-        p->tf->regs[10] = uart_gets(buf, len);
-        if (copy_to_user((void *)p->tf->regs[11], buf, len) < 0) {
-            p->tf->regs[10] = -1;
-            break;
-        }
+        p->tf->regs[10] = sys_read(p->tf->regs[10], (void *)p->tf->regs[11], p->tf->regs[12]);
         break;
     }
     case SYS_exit:
@@ -79,28 +41,14 @@ syscall_handler(proc_t *p)
         break;
     case SYS_sleep_ms:
         DEBUG_PRINT(uart_puts("SYS_sleep_ms\n"););
-
-        ulong ms = p->tf->regs[10];
-        if (ms == 0 || ms > MAX_SLEEP_MS) {
-            p->tf->regs[10] = -1;
-            break;
-        }
-        /*
-        DEBUG_PRINT(
-            uart_puts("Proc id ");
-            uart_putc('0' + p->pid);
-            uart_puts(" going to sleep for ");
-            uart_putlong(ms / 1000);
-            uart_puts(" seconds\n");
-        );
-        */
-
-        p->state = SLEEPING;
-        list_add_tail(&p->q_node, &c->sleep_queue);
-        p->sleep_until = read_time() + MS_TO_TIME(ms);
-        p->tf->regs[10] = 0;
-
+        p->tf->regs[10] = sys_sleep_ms(c, p, p->tf->regs[10]);
         c->needs_sched = 1;
+        break;
+    case SYS_sbrk:
+        p->tf->regs[10] = sys_sbrk(p, p->tf->regs[10]);
+        break;
+    case SYS_munmap:
+        p->tf->regs[10] = sys_munmap(p, p->tf->regs[10], p->tf->regs[11]);
         break;
     default:
         DEBUG_PRINT(
